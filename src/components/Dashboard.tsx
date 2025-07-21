@@ -42,10 +42,19 @@ const Dashboard = () => {
                 Compare and analyze college transfer credit policies
               </p>
             </div>
-            <Button onClick={handleCreateAssessment} className="bg-primary hover:bg-primary-hover">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Assessment
-            </Button>
+            <div className="flex gap-3">
+              <Button onClick={handleCreateAssessment} className="bg-primary hover:bg-primary-hover">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Assessment
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/comparison')}
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Compare Schools
+              </Button>
+            </div>
           </div>
         </div>
       </div>
