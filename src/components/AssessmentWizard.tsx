@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ArrowRight, CheckCircle, Users, BarChart3, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Users, BarChart3, Loader2, AlertCircle } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import WeightSlider from "./WeightSlider";
 import { Institution, assessmentCriteria } from "@/data/mockData";

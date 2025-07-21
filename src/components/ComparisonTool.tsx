@@ -97,23 +97,32 @@ const ComparisonTool = () => {
 
     try {
       const schoolNames = validSchools.map(school => school!.name);
+      const requestBody = {
+        schools: schoolNames,
+        weights: weights
+      };
+      
+      console.log('Making POST request to compare schools:', requestBody);
       
       const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          schools: schoolNames,
-          weights: weights
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       if (!response.ok) {
-        throw new Error('Failed to compare schools');
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`Failed to compare schools: ${response.status} ${errorText}`);
       }
 
       const data: ComparisonResponse = await response.json();
+      console.log('Comparison response:', data);
       setComparisonResult(data);
     } catch (error) {
       console.error('Comparison error:', error);
