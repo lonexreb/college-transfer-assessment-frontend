@@ -77,19 +77,18 @@ const AssessmentWizard = () => {
     
     try {
       // Prepare the data for the API call
-      const schoolNames = [
-        state.targetInstitution?.name,
-        ...state.competitors.filter(comp => comp !== null).map(comp => comp!.name)
-      ].filter(Boolean);
+      const competitorNames = state.competitors
+        .filter(comp => comp !== null)
+        .map(comp => comp!.name);
 
       const requestBody = {
-        schools: schoolNames,
-        weights: state.weights
+        primary_college: state.targetInstitution?.name,
+        competitor_colleges: competitorNames
       };
 
       console.log('Generating assessment with:', requestBody);
 
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/transfer-assessment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
