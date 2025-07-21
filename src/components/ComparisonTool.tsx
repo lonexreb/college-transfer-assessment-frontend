@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,40 +17,44 @@ interface SchoolData {
   name: string;
   city: string;
   state: string;
-  website: string;
   ownership: string;
   student_size: number;
+  admission_rate: number;
   in_state_tuition: number;
   out_of_state_tuition: number;
+  median_earnings_10yr: number;
+}
+
+interface ComparisonWeights {
+  transfer_navigation: number;
+  landing_pages: number;
+  evaluation_tools: number;
+  articulation_agreements: number;
+  support_resources: number;
+  application_process: number;
 }
 
 interface ComparisonResponse {
-  primary_college: SchoolData;
-  competitor_colleges: SchoolData[];
-  tfa_report: string;
+  schools_data: SchoolData[];
+  ai_report: string;
 }
 
 const ComparisonTool = () => {
   const navigate = useNavigate();
   const [selectedSchools, setSelectedSchools] = useState<(Institution | null)[]>([null, null, null]);
+  const [weights, setWeights] = useState<ComparisonWeights>({
+    transfer_navigation: 20,
+    landing_pages: 15,
+    evaluation_tools: 25,
+    articulation_agreements: 10,
+    support_resources: 20,
+    application_process: 10
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load assessment results from wizard if available
-  useEffect(() => {
-    const storedResult = sessionStorage.getItem('assessmentResult');
-    if (storedResult) {
-      try {
-        const parsedResult = JSON.parse(storedResult);
-        setComparisonResult(parsedResult);
-        // Clear the stored result after loading
-        sessionStorage.removeItem('assessmentResult');
-      } catch (error) {
-        console.error('Failed to parse stored assessment result:', error);
-      }
-    }
-  }, []);
+  const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
 
   const handleSchoolChange = (index: number, institution: Institution | null) => {
     setSelectedSchools(prev => 
@@ -58,7 +62,9 @@ const ComparisonTool = () => {
     );
   };
 
-  
+  const handleWeightChange = (key: keyof ComparisonWeights, value: number) => {
+    setWeights(prev => ({ ...prev, [key]: value }));
+  };
 
   const addSchoolSlot = () => {
     if (selectedSchools.length < 5) {
@@ -90,17 +96,15 @@ const ComparisonTool = () => {
     setError(null);
 
     try {
-      const primarySchool = validSchools[0]!.name;
-      const competitorSchools = validSchools.slice(1).map(school => school!.name);
-      
+      const schoolNames = validSchools.map(school => school!.name);
       const requestBody = {
-        primary_college: primarySchool,
-        competitor_colleges: competitorSchools
+        schools: schoolNames,
+        weights: weights
       };
       
-      console.log('Making POST request to transfer assessment:', requestBody);
+      console.log('Making POST request to compare schools:', requestBody);
       
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/transfer-assessment', {
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,14 +221,36 @@ const ComparisonTool = () => {
               </CardContent>
             </Card>
 
+            {/* Assessment Weights */}
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Transfer Assessment</CardTitle>
+                <CardTitle>Assessment Weights</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Generate a comprehensive transfer friendliness assessment
+                  Adjust the importance of each criteria (Total: {totalWeight}%)
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
+                {Object.entries(weights).map(([key, value]) => (
+                  <div key={key} className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label className="text-sm capitalize">
+                        {key.replace(/_/g, ' ')}
+                      </Label>
+                      <span className="text-sm text-muted-foreground">{value}%</span>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={value}
+                      onChange={(e) => handleWeightChange(key as keyof ComparisonWeights, Number(e.target.value))}
+                      className="text-sm"
+                    />
+                  </div>
+                ))}
+                
+                <Separator />
+                
                 <div className="text-center">
                   <Button
                     onClick={handleCompare}
@@ -234,12 +260,12 @@ const ComparisonTool = () => {
                     {isLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Assessment...
+                        Comparing Schools...
                       </>
                     ) : (
                       <>
                         <TrendingUp className="w-4 h-4 mr-2" />
-                        Generate Assessment
+                        Compare Schools
                       </>
                     )}
                   </Button>
@@ -270,94 +296,57 @@ const ComparisonTool = () => {
                           <TableRow>
                             <TableHead>School</TableHead>
                             <TableHead>Location</TableHead>
-                            <TableHead>Website</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Students</TableHead>
+                            <TableHead>Admission Rate</TableHead>
                             <TableHead>In-State Tuition</TableHead>
                             <TableHead>Out-of-State Tuition</TableHead>
+                            <TableHead>Median Earnings</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {/* Primary College */}
-                          <TableRow>
-                            <TableCell className="font-medium">
-                              <div>
-                                {comparisonResult.primary_college.name}
-                                <Badge variant="default" className="ml-2 text-xs">
-                                  Primary
-                                </Badge>
-                              </div>
-                            </TableCell>
-                            <TableCell>{comparisonResult.primary_college.city}, {comparisonResult.primary_college.state}</TableCell>
-                            <TableCell>
-                              <a 
-                                href={comparisonResult.primary_college.website} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                Visit Website
-                              </a>
-                            </TableCell>
-                            <TableCell>{comparisonResult.primary_college.ownership}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {comparisonResult.primary_college.student_size ? formatStudentSize(comparisonResult.primary_college.student_size) : 'N/A'}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="w-3 h-3" />
-                                {comparisonResult.primary_college.in_state_tuition ? formatCurrency(comparisonResult.primary_college.in_state_tuition) : 'N/A'}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="w-3 h-3" />
-                                {comparisonResult.primary_college.out_of_state_tuition ? formatCurrency(comparisonResult.primary_college.out_of_state_tuition) : 'N/A'}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {/* Competitor Colleges */}
-                          {comparisonResult.competitor_colleges.map((school, index) => (
+                          {comparisonResult.schools_data.map((school, index) => (
                             <TableRow key={index}>
                               <TableCell className="font-medium">
                                 <div>
                                   {school.name}
-                                  <Badge variant="outline" className="ml-2 text-xs">
-                                    Competitor {index + 1}
-                                  </Badge>
+                                  {index === 0 && (
+                                    <Badge variant="default" className="ml-2 text-xs">
+                                      Primary
+                                    </Badge>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>{school.city}, {school.state}</TableCell>
-                              <TableCell>
-                                <a 
-                                  href={school.website} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  Visit Website
-                                </a>
-                              </TableCell>
                               <TableCell>{school.ownership}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <Users className="w-3 h-3" />
-                                  {school.student_size ? formatStudentSize(school.student_size) : 'N/A'}
+                                  {formatStudentSize(school.student_size)}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <GraduationCap className="w-3 h-3" />
+                                  {formatPercentage(school.admission_rate)}
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <DollarSign className="w-3 h-3" />
-                                  {school.in_state_tuition ? formatCurrency(school.in_state_tuition) : 'N/A'}
+                                  {formatCurrency(school.in_state_tuition)}
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <DollarSign className="w-3 h-3" />
-                                  {school.out_of_state_tuition ? formatCurrency(school.out_of_state_tuition) : 'N/A'}
+                                  {formatCurrency(school.out_of_state_tuition)}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="w-3 h-3" />
+                                  {formatCurrency(school.median_earnings_10yr)}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -368,15 +357,15 @@ const ComparisonTool = () => {
                   </CardContent>
                 </Card>
 
-                {/* Transfer Friendliness Assessment Report */}
+                {/* AI Analysis Report */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Transfer Friendliness Assessment Report</CardTitle>
+                    <CardTitle>AI Analysis Report</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="prose max-w-none">
                       <div className="whitespace-pre-wrap text-foreground">
-                        {comparisonResult.tfa_report}
+                        {comparisonResult.ai_report}
                       </div>
                     </div>
                   </CardContent>
@@ -387,10 +376,10 @@ const ComparisonTool = () => {
                 <CardContent className="p-12 text-center">
                   <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">
-                    Ready to Generate Assessment
+                    Ready to Compare Schools
                   </h3>
                   <p className="text-muted-foreground">
-                    Select at least 2 schools and click "Generate Assessment" to see detailed transfer friendliness analysis
+                    Select at least 2 schools and click "Compare Schools" to see detailed analysis
                   </p>
                 </CardContent>
               </Card>
