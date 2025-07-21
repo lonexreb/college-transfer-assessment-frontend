@@ -7,7 +7,7 @@ import AssessmentWizard from "./components/AssessmentWizard";
 import ReportDisplay from "./components/ReportDisplay";
 import Dashboard from "./components/Dashboard";
 import ComparisonTool from "./components/ComparisonTool";
-import { Toaster } from "@/components/ui/toaster";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
