@@ -89,32 +89,15 @@ const AssessmentWizard = () => {
 
       console.log('Generating assessment with:', requestBody);
 
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Assessment API error:', errorText);
-        throw new Error(`Failed to generate assessment: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Assessment response:', data);
-      
-      // Store the result in sessionStorage so we can access it on the comparison page
-      sessionStorage.setItem('assessmentResult', JSON.stringify({
-        ...data,
+      // Store the assessment config for the comparison page
+      sessionStorage.setItem('assessmentConfig', JSON.stringify({
+        schoolNames,
+        weights: state.weights,
         targetInstitution: state.targetInstitution,
         competitors: state.competitors.filter(comp => comp !== null),
-        weights: state.weights
       }));
 
-      // Navigate to comparison tool to show results
+      // Navigate to comparison tool which will handle the streaming
       navigate('/comparison');
       
     } catch (error) {

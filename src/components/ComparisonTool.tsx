@@ -54,20 +54,129 @@ const ComparisonTool = () => {
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load assessment results from wizard if available
+  // Load assessment config from wizard if available and start streaming
   useEffect(() => {
-    const storedResult = sessionStorage.getItem('assessmentResult');
-    if (storedResult) {
+    const storedConfig = sessionStorage.getItem('assessmentConfig');
+    if (storedConfig) {
       try {
-        const parsedResult = JSON.parse(storedResult);
-        setComparisonResult(parsedResult);
-        // Clear the stored result after loading
-        sessionStorage.removeItem('assessmentResult');
+        const config = JSON.parse(storedConfig);
+        // Clear the stored config after loading
+        sessionStorage.removeItem('assessmentConfig');
+        
+        // Set the schools and weights from the config
+        const newSelectedSchools = config.schoolNames.map((name: string, index: number) => ({
+          id: `config-${index}`,
+          name: name,
+          state: 'Unknown',
+          type: 'Unknown',
+          enrollmentSize: 'Unknown'
+        }));
+        
+        // Pad with nulls to match the expected array length
+        while (newSelectedSchools.length < 3) {
+          newSelectedSchools.push(null);
+        }
+        
+        setSelectedSchools(newSelectedSchools);
+        setWeights(config.weights);
+        
+        // Automatically start the comparison
+        handleStreamingCompare(config.schoolNames, config.weights);
+        
       } catch (error) {
-        console.error('Failed to parse stored assessment result:', error);
+        console.error('Failed to parse stored assessment config:', error);
       }
     }
   }, []);
+
+  const handleStreamingCompare = async (schoolNames: string[], compareWeights: ComparisonWeights) => {
+    setIsLoading(true);
+    setError(null);
+    setComparisonResult({ schools_data: [], ai_report: '' });
+
+    try {
+      const requestBody = {
+        schools: schoolNames,
+        weights: compareWeights
+      };
+      
+      console.log('Making streaming POST request:', requestBody);
+      
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare-stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Streaming response error:', errorText);
+        throw new Error(`Failed to start streaming: ${response.status} ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              switch(data.type) {
+                case 'schools_data':
+                  console.log('Schools data received:', data.data);
+                  setComparisonResult(prev => ({
+                    ...prev,
+                    schools_data: data.data
+                  }));
+                  break;
+                  
+                case 'ai_chunk':
+                  console.log('AI chunk received:', data.data);
+                  setComparisonResult(prev => ({
+                    ...prev,
+                    ai_report: prev.ai_report + data.data
+                  }));
+                  break;
+                  
+                case 'complete':
+                  console.log('Stream complete');
+                  setIsLoading(false);
+                  break;
+                  
+                default:
+                  console.log('Unknown data type:', data.type);
+              }
+            } catch (parseError) {
+              console.error('Failed to parse SSE data:', parseError);
+            }
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Streaming comparison error:', error);
+      setError('Failed to compare schools. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
 
@@ -107,44 +216,8 @@ const ComparisonTool = () => {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const schoolNames = validSchools.map(school => school!.name);
-      const requestBody = {
-        schools: schoolNames,
-        weights: weights
-      };
-      
-      console.log('Making POST request to compare schools:', requestBody);
-      
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error:', errorText);
-        throw new Error(`Failed to compare schools: ${response.status} ${errorText}`);
-      }
-
-      const data: ComparisonResponse = await response.json();
-      console.log('Comparison response:', data);
-      setComparisonResult(data);
-    } catch (error) {
-      console.error('Comparison error:', error);
-      setError('Failed to compare schools. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    const schoolNames = validSchools.map(school => school!.name);
+    await handleStreamingCompare(schoolNames, weights);
   };
 
   const formatCurrency = (amount: number) => {
