@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -242,9 +243,7 @@ const InstitutionSearch = ({
             </div>
           )}
         </div>
-      )}</div>
-  );
-};
+      )}
     </div>
   );
 };
