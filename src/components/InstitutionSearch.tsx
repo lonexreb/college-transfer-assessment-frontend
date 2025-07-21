@@ -61,7 +61,7 @@ const InstitutionSearch = ({
     setSearchError(null);
 
     try {
-      const response = await fetch('/api/search', {
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
