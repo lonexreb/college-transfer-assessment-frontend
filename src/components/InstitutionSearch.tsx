@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Search, MapPin, Users } from "lucide-react";
-import { Institution, mockInstitutions } from "@/data/mockData";
+import { X, Search, MapPin, Users, Loader2 } from "lucide-react";
+import { Institution } from "@/data/mockData";
 
 interface InstitutionSearchProps {
   value: Institution | null;
@@ -24,20 +24,80 @@ const InstitutionSearch = ({
 }: InstitutionSearchProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const filteredInstitutions = mockInstitutions.filter(institution => {
-    if (excludeIds.includes(institution.id)) return false;
-    if (!searchQuery) return true;
-    
-    const query = searchQuery.toLowerCase();
-    return (
-      institution.name.toLowerCase().includes(query) ||
-      institution.state.toLowerCase().includes(query) ||
-      institution.type.toLowerCase().includes(query)
-    );
-  });
+  // Convert backend response to Institution format
+  const convertToInstitution = (school: any, index: number): Institution => {
+    const getEnrollmentSize = (size: number | null) => {
+      if (!size) return 'Unknown';
+      if (size < 5000) return 'Small (<5,000)';
+      if (size < 10000) return 'Medium-Small (5,000-10,000)';
+      if (size < 30000) return 'Medium (10,000-30,000)';
+      return 'Large (30,000+)';
+    };
+
+    return {
+      id: `search-${index}`,
+      name: school.name || 'Unknown Institution',
+      state: school.state || 'Unknown',
+      type: school.ownership || 'Unknown',
+      enrollmentSize: getEnrollmentSize(school.size)
+    };
+  };
+
+  // Search function
+  const searchInstitutions = async (query: string) => {
+    if (!query.trim()) {
+      setInstitutions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setSearchError(null);
+
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: query.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search institutions');
+      }
+
+      const data = await response.json();
+      const convertedInstitutions = data.schools.map(convertToInstitution);
+      setInstitutions(convertedInstitutions);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError('Failed to search institutions. Please try again.');
+      setInstitutions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Debounce search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery && isOpen) {
+        searchInstitutions(searchQuery);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, isOpen]);
+
+  const filteredInstitutions = institutions.filter(institution => 
+    !excludeIds.includes(institution.id)
+  );
 
   const handleSelect = (institution: Institution) => {
     onChange(institution);
@@ -52,8 +112,15 @@ const InstitutionSearch = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    const newQuery = e.target.value;
+    setSearchQuery(newQuery);
     setIsOpen(true);
+    
+    // Clear results if query is empty
+    if (!newQuery.trim()) {
+      setInstitutions([]);
+      setSearchError(null);
+    }
   };
 
   const handleInputFocus = () => {
@@ -133,7 +200,16 @@ const InstitutionSearch = ({
           ref={dropdownRef}
           className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-60 overflow-y-auto"
         >
-          {filteredInstitutions.length > 0 ? (
+          {isLoading ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+              Searching institutions...
+            </div>
+          ) : searchError ? (
+            <div className="p-4 text-center text-destructive">
+              <div className="text-sm">{searchError}</div>
+            </div>
+          ) : filteredInstitutions.length > 0 ? (
             <div className="p-1">
               {filteredInstitutions.map((institution) => (
                 <button
@@ -155,13 +231,20 @@ const InstitutionSearch = ({
                 </button>
               ))}
             </div>
+          ) : searchQuery ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <div className="text-sm">No institutions found matching "{searchQuery}"</div>
+              <div className="text-xs mt-1">Try a different search term</div>
+            </div>
           ) : (
             <div className="p-4 text-center text-muted-foreground">
-              No institutions found matching "{searchQuery}"
+              <div className="text-sm">Start typing to search institutions...</div>
             </div>
           )}
         </div>
-      )}
+      )}</div>
+  );
+};
     </div>
   );
 };
