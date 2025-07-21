@@ -1,9 +1,31 @@
-import './App.css'
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Dashboard from "./components/Dashboard";
+import AssessmentWizard from "./components/AssessmentWizard";
+import ReportDisplay from "./components/ReportDisplay";
+import NotFound from "./pages/NotFound";
 
-export default function App() {
-  return (
-    <main>
-      React ⚛️ + Vite ⚡ + Replit 🌀
-    </main>
-  )
-}
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/assessment/new" element={<AssessmentWizard />} />
+          <Route path="/report/:id" element={<ReportDisplay />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
