@@ -1,0 +1,101 @@
+× the name `NotFound` is defined multiple times
+    ╭─[/home/runner/workspace/src/pages/NotFound.tsx:4:1]
+  1 │ import { useLocation } from "react-router-dom";
+  2 │ import { useEffect } from "react";
+  3 │ 
+  4 │ const NotFound = () => {
+    ·       ────┬───
+    ·           ╰── previous definition of `NotFound` here
+  5 │   const location = useLocation();
+  6 │ 
+  7 │   useEffect(() => {
+  8 │     console.error(
+  9 │       "404 Error: User attempted to access non-existent route:",
+ 10 │       location.pathname
+ 11 │     );
+ 12 │   }, [location.pathname]);
+ 13 │ 
+ 14 │   return (
+ 15 │     <div className="min-h-screen flex items-center justify-center bg-gray-100">
+ 16 │       <div className="text-center">
+ 17 │         <h1 className="text-4xl font-bold mb-4">404</h1>
+ 18 │         <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
+ 19 │         <a href="/" className="text-blue-500 hover:text-blue-700 underline">
+ 20 │           Return to Home
+ 21 │         </a>
+ 22 │       </div>
+ 23 │     </div>
+ 24 │   );
+ 25 │ };
+ 26 │ 
+ 27 │ export default NotFound;
+ 28 │ import { Button } from "@/components/ui/button";
+ 29 │ import { Card, CardContent } from "@/components/ui/card";
+ 30 │ import { ArrowLeft, Home } from "lucide-react";
+ 31 │ import { useNavigate } from "react-router-dom";
+ 32 │ 
+ 33 │ const NotFound = () => {
+    ·       ────┬───
+    ·           ╰── `NotFound` redefined here
+ 34 │   const navigate = useNavigate();
+ 35 │ 
+ 36 │   return (
+    ╰────
+  × the name `default` is exported multiple times
+    ╭─[/home/runner/workspace/src/pages/NotFound.tsx:27:1]
+ 24 │   );
+ 25 │ };
+ 26 │ 
+ 27 │ export default NotFound;
+    · ────────────┬───────────
+    ·             ╰── previous exported here
+ 28 │ import { Button } from "@/components/ui/button";
+ 29 │ import { Card, CardContent } from "@/components/ui/card";
+ 30 │ import { ArrowLeft, Home } from "lucide-react";
+ 31 │ import { useNavigate } from "react-router-dom";
+ 32 │ 
+ 33 │ const NotFound = () => {
+ 34 │   const navigate = useNavigate();
+ 35 │ 
+ 36 │   return (
+ 37 │     <div className="min-h-screen bg-background flex items-center justify-center">
+ 38 │       <Card className="w-full max-w-md">
+ 39 │         <CardContent className="p-8 text-center">
+ 40 │           <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
+ 41 │           <h2 className="text-2xl font-semibold text-foreground mb-2">Page Not Found</h2>
+ 42 │           <p className="text-muted-foreground mb-6">
+ 43 │             The page you're looking for doesn't exist.
+ 44 │           </p>
+ 45 │           <div className="flex gap-2 justify-center">
+ 46 │             <Button variant="outline" onClick={() => navigate(-1)}>
+ 47 │               <ArrowLeft className="w-4 h-4 mr-2" />
+ 48 │               Go Back
+ 49 │             </Button>
+ 50 │             <Button onClick={() => navigate('/')}>
+ 51 │               <Home className="w-4 h-4 mr-2" />
+ 52 │               Home
+ 53 │             </Button>
+ 54 │           </div>
+ 55 │         </CardContent>
+ 56 │       </Card>
+ 57 │     </div>
+ 58 │   );
+ 59 │ };
+ 60 │ 
+ 61 │ export default NotFound;
+    · ────────────┬───────────
+    ·             ╰── exported more than once
+    ╰────
+
+Advice:   ☞ Exported identifiers must be unique
+
+/home/runner/workspace/src/pages/NotFound.tsx:4:1
+
+27 |  export default NotFound;
+28 |  import { Button } from "@/components/ui/button";
+29 |  import { Card, CardContent } from "@/components/ui/card";
+   |                                                       ^
+30 |  import { ArrowLeft, Home } from "lucide-react";
+31 |  import { useNavigate } from "react-router-dom";
+
+Click
