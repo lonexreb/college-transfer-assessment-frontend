@@ -73,10 +73,56 @@ const AssessmentWizard = () => {
   };
 
   const handleGenerate = async () => {
-    // In a real app, this would save the assessment and generate the report
-    console.log('Generating assessment with:', state);
-    // Navigate to a report (using first completed assessment as example)
-    navigate('/report/1');
+    setIsGenerating(true);
+    
+    try {
+      // Prepare the data for the API call
+      const schoolNames = [
+        state.targetInstitution?.name,
+        ...state.competitors.filter(comp => comp !== null).map(comp => comp!.name)
+      ].filter(Boolean);
+
+      const requestBody = {
+        schools: schoolNames,
+        weights: state.weights
+      };
+
+      console.log('Generating assessment with:', requestBody);
+
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Assessment API error:', errorText);
+        throw new Error(`Failed to generate assessment: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Assessment response:', data);
+      
+      // Store the result in sessionStorage so we can access it on the comparison page
+      sessionStorage.setItem('assessmentResult', JSON.stringify({
+        ...data,
+        targetInstitution: state.targetInstitution,
+        competitors: state.competitors.filter(comp => comp !== null),
+        weights: state.weights
+      }));
+
+      // Navigate to comparison tool to show results
+      navigate('/comparison');
+      
+    } catch (error) {
+      console.error('Assessment generation error:', error);
+      // You might want to show an error toast here
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const renderStep1 = () => (

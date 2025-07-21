@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,21 @@ const ComparisonTool = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Load assessment results from wizard if available
+  useEffect(() => {
+    const storedResult = sessionStorage.getItem('assessmentResult');
+    if (storedResult) {
+      try {
+        const parsedResult = JSON.parse(storedResult);
+        setComparisonResult(parsedResult);
+        // Clear the stored result after loading
+        sessionStorage.removeItem('assessmentResult');
+      } catch (error) {
+        console.error('Failed to parse stored assessment result:', error);
+      }
+    }
+  }, []);
 
   const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
 
