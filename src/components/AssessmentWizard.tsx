@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Users, BarChart3, Loader2 } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import WeightSlider from "./WeightSlider";
 import { Institution, assessmentCriteria } from "@/data/mockData";
@@ -19,6 +19,7 @@ interface AssessmentWizardState {
 const AssessmentWizard = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [state, setState] = useState<AssessmentWizardState>({
     targetInstitution: null,
     competitors: [null, null, null],
@@ -71,7 +72,7 @@ const AssessmentWizard = () => {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     // In a real app, this would save the assessment and generate the report
     console.log('Generating assessment with:', state);
     // Navigate to a report (using first completed assessment as example)
@@ -180,7 +181,7 @@ const AssessmentWizard = () => {
               <span className="font-medium text-foreground">{state.targetInstitution?.name}</span>
             </div>
           </div>
-          
+
           {hasAnyCompetitors && (
             <div>
               <p className="text-sm font-medium text-foreground mb-2">Competitors:</p>
