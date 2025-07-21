@@ -12,6 +12,7 @@ import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationC
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 
 interface SchoolData {
   name: string;
@@ -451,10 +452,26 @@ const ComparisonTool = () => {
                     <CardTitle>AI Analysis Report</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="prose max-w-none">
-                      <div className="whitespace-pre-wrap text-foreground">
-                        {comparisonResult.ai_report}
-                      </div>
+                    <div className="prose max-w-none text-foreground">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({children}) => <h1 className="text-2xl font-bold mb-4 text-foreground">{children}</h1>,
+                          h2: ({children}) => <h2 className="text-xl font-semibold mb-3 text-foreground">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-lg font-medium mb-2 text-foreground">{children}</h3>,
+                          p: ({children}) => <p className="mb-3 text-foreground leading-relaxed">{children}</p>,
+                          ul: ({children}) => <ul className="list-disc list-inside mb-3 text-foreground">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside mb-3 text-foreground">{children}</ol>,
+                          li: ({children}) => <li className="mb-1 text-foreground">{children}</li>,
+                          strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
+                          em: ({children}) => <em className="italic text-foreground">{children}</em>,
+                          blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 italic mb-3 text-muted-foreground">{children}</blockquote>,
+                          code: ({inline, children}) => inline ? 
+                            <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">{children}</code> :
+                            <code className="block bg-muted p-3 rounded text-sm font-mono overflow-x-auto mb-3">{children}</code>
+                        }}
+                      >
+                        {comparisonResult.ai_report || 'Generating analysis...'}
+                      </ReactMarkdown>
                     </div>
                   </CardContent>
                 </Card>
