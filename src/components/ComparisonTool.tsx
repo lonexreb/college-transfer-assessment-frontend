@@ -507,7 +507,7 @@ const ComparisonTool = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>AI Analysis Report</CardTitle>
-                      {comparisonResult.ai_report && comparisonResult.ai_report.trim().length > 0 && (
+                      {comparisonResult && comparisonResult.ai_report && (
                         <Button
                           onClick={handleGeneratePresentation}
                           disabled={isGeneratingPresentation}
