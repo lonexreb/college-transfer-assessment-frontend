@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
@@ -54,6 +54,7 @@ const ComparisonTool = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
 
   // Load assessment config from wizard if available and start streaming
   useEffect(() => {
@@ -236,6 +237,61 @@ const ComparisonTool = () => {
 
   const formatStudentSize = (size: number) => {
     return new Intl.NumberFormat('en-US').format(size);
+  };
+
+  const handleGeneratePresentation = async () => {
+    if (!comparisonResult || !comparisonResult.ai_report) {
+      setError("No comparison results available for presentation generation");
+      return;
+    }
+
+    setIsGeneratingPresentation(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('prompt', `School Comparison Analysis: ${comparisonResult.ai_report}`);
+      formData.append('n_slides', '8');
+      formData.append('language', 'English');
+      formData.append('theme', 'light');
+      formData.append('export_as', 'pptx');
+
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/v1/ppt/generate/presentation', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate presentation: ${response.status}`);
+      }
+
+      // Get the filename from response headers or create a default one
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'school_comparison_presentation.pptx';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+    } catch (error) {
+      console.error('Presentation generation error:', error);
+      setError('Failed to generate presentation. Please try again.');
+    } finally {
+      setIsGeneratingPresentation(false);
+    }
   };
 
   return (
@@ -449,7 +505,29 @@ const ComparisonTool = () => {
                 {/* AI Analysis Report */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>AI Analysis Report</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>AI Analysis Report</CardTitle>
+                      {comparisonResult.ai_report && !isLoading && (
+                        <Button
+                          onClick={handleGeneratePresentation}
+                          disabled={isGeneratingPresentation}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {isGeneratingPresentation ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Generate Presentation
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="prose max-w-none text-foreground">
