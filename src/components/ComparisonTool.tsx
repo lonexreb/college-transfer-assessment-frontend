@@ -55,6 +55,11 @@ const ComparisonTool = () => {
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
+  const [presentationResult, setPresentationResult] = useState<{
+    presentation_id: string;
+    path: string;
+    edit_path: string;
+  } | null>(null);
 
   // Load assessment config from wizard if available and start streaming
   useEffect(() => {
@@ -247,6 +252,7 @@ const ComparisonTool = () => {
 
     setIsGeneratingPresentation(true);
     setError(null);
+    setPresentationResult(null);
 
     try {
       const formData = new FormData();
@@ -265,26 +271,8 @@ const ComparisonTool = () => {
         throw new Error(`Failed to generate presentation: ${response.status}`);
       }
 
-      // Get the filename from response headers or create a default one
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'school_comparison_presentation.pptx';
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="(.+)"/);
-        if (match) {
-          filename = match[1];
-        }
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const result = await response.json();
+      setPresentationResult(result);
 
     } catch (error) {
       console.error('Presentation generation error:', error);
@@ -507,26 +495,48 @@ const ComparisonTool = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>AI Analysis Report</CardTitle>
-                      {comparisonResult && comparisonResult.ai_report && (
-                        <Button
-                          onClick={handleGeneratePresentation}
-                          disabled={isGeneratingPresentation}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {isGeneratingPresentation ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
+                      <div className="flex gap-2">
+                        {comparisonResult && comparisonResult.ai_report && !presentationResult && (
+                          <Button
+                            onClick={handleGeneratePresentation}
+                            disabled={isGeneratingPresentation}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {isGeneratingPresentation ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Generate Presentation
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        
+                        {presentationResult && (
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.path}`, '_blank')}
+                              variant="default"
+                              size="sm"
+                            >
                               <FileText className="w-4 h-4 mr-2" />
-                              Generate Presentation
-                            </>
-                          )}
-                        </Button>
-                      )}
+                              View Presentation
+                            </Button>
+                            <Button
+                              onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Edit Presentation
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
