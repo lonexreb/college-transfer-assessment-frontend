@@ -518,23 +518,14 @@ const ComparisonTool = () => {
                         )}
                         
                         {presentationResult && (
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.path}`, '_blank')}
-                              variant="default"
-                              size="sm"
-                            >
-                              <FileText className="w-4 h-4 mr-2" />
-                              View Presentation
-                            </Button>
-                            <Button
-                              onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Edit Presentation
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
+                            variant="default"
+                            size="sm"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View Presentation
+                          </Button>
                         )}
                       </div>
                     </div>
