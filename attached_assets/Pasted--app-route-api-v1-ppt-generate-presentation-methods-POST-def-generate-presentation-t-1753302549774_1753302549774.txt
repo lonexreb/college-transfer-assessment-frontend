@@ -1,0 +1,133 @@
+@app.route('/api/v1/ppt/generate/presentation', methods=['POST'])
+def generate_presentation():
+    try:
+        # Get form data from the request
+        prompt = request.form.get('prompt', '')
+        n_slides = int(request.form.get('n_slides', 5))
+        language = request.form.get('language', 'English')
+        theme = request.form.get('theme', 'light')
+        export_as = request.form.get('export_as', 'pptx')
+        
+        if not prompt:
+            return jsonify({'error': 'Prompt is required'}), 400
+        
+        # Generate content using AI
+        content_prompt = f"""Create a {n_slides}-slide presentation about: {prompt}
+        
+Language: {language}
+Theme: {theme}
+
+For each slide, provide:
+1. Slide title
+2. Main content (bullet points or paragraphs)
+3. Any additional notes
+
+Format the response as JSON with this structure:
+{{
+  "title": "Presentation Title",
+  "slides": [
+    {{
+      "title": "Slide Title",
+      "content": ["Point 1", "Point 2", "Point 3"],
+      "notes": "Speaker notes for this slide"
+    }}
+  ]
+}}
+
+Keep content concise and engaging. Make sure there are exactly {n_slides} slides."""
+
+        # Generate content using Replicate
+        content_text = ""
+        for event in replicate.stream(
+            "openai/gpt-4o",
+            input={
+                "top_p": 1,
+                "prompt": content_prompt,
+                "temperature": 0.7,
+                "system_prompt": "You are a professional presentation designer. Create engaging, well-structured presentation content in valid JSON format.",
+                "max_completion_tokens": 2048
+            },
+        ):
+            content_text += str(event)
+        
+        # Parse the AI response
+        try:
+            # Try to extract JSON from the response
+            start_idx = content_text.find('{')
+            end_idx = content_text.rfind('}') + 1
+            if start_idx != -1 and end_idx != -1:
+                json_content = content_text[start_idx:end_idx]
+                presentation_data = json.loads(json_content)
+            else:
+                raise ValueError("No JSON found in response")
+        except (json.JSONDecodeError, ValueError):
+            # Fallback: create a simple structure
+            presentation_data = {
+                "title": prompt,
+                "slides": [
+                    {
+                        "title": f"Slide {i+1}",
+                        "content": ["Main point 1", "Main point 2", "Main point 3"],
+                        "notes": f"This is slide {i+1} about {prompt}"
+                    }
+                    for i in range(n_slides)
+                ]
+            }
+        
+        # Create PowerPoint presentation
+        prs = Presentation()
+        
+        # Title slide
+        title_slide_layout = prs.slide_layouts[0]
+        slide = prs.slides.add_slide(title_slide_layout)
+        title = slide.shapes.title
+        subtitle = slide.placeholders[1]
+        
+        title.text = presentation_data.get('title', prompt)
+        subtitle.text = f"Generated Presentation - {n_slides} slides"
+        
+        # Content slides
+        for slide_data in presentation_data.get('slides', []):
+            slide_layout = prs.slide_layouts[1]  # Content layout
+            slide = prs.slides.add_slide(slide_layout)
+            
+            title = slide.shapes.title
+            content = slide.placeholders[1]
+            
+            title.text = slide_data.get('title', 'Slide Title')
+            
+            # Add content
+            content_items = slide_data.get('content', [])
+            if isinstance(content_items, list):
+                content.text = '\n• '.join([''] + content_items)
+            else:
+                content.text = str(content_items)
+        
+        # Save presentation to memory
+        ppt_io = io.BytesIO()
+        prs.save(ppt_io)
+        ppt_io.seek(0)
+        
+        if export_as == 'pptx':
+            # Return the file as download
+            return Response(
+                ppt_io.read(),
+                mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{prompt[:30].replace(" ", "_")}.pptx"',
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                }
+            )
+        else:
+            # Return base64 encoded for other formats
+            ppt_base64 = base64.b64encode(ppt_io.read()).decode('utf-8')
+            return jsonify({
+                'success': True,
+                'presentation_title': presentation_data.get('title', prompt),
+                'slides_count': len(presentation_data.get('slides', [])),
+                'file_data': ppt_base64,
+                'filename': f"{prompt[:30].replace(' ', '_')}.pptx"
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Failed to generate presentation: {str(e)}'}), 500
