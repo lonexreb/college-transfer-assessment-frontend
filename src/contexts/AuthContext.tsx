@@ -49,21 +49,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      const token = await user.getIdToken();
       const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/admin/check', {
         headers: {
-          'Authorization': `Bearer ${await user.getIdToken()}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
       if (response.ok) {
         const data = await response.json();
-        setIsAdmin(data.isAdmin);
+        setIsAdmin(data.isAdmin || false);
       } else {
+        console.log('Admin check failed:', response.status);
         setIsAdmin(false);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
+      // Set admin to false but don't prevent app from working
       setIsAdmin(false);
     }
   };

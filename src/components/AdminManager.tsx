@@ -55,7 +55,7 @@ const AdminManager = () => {
   }, [isAdmin, currentUser]);
 
   const handleAddAdmin = async () => {
-    if (!newAdminEmail.trim() || !currentUser) return;
+    if (!newAdminEmail.trim()) return;
 
     setLoading(true);
     try {

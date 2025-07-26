@@ -74,11 +74,23 @@ const InstitutionSearch = ({
       }
 
       const data = await response.json();
-      const convertedInstitutions = data.schools.map(convertToInstitution);
+      
+      // Handle different response formats from backend
+      let schools = [];
+      if (data.schools && Array.isArray(data.schools)) {
+        schools = data.schools;
+      } else if (Array.isArray(data)) {
+        schools = data;
+      } else {
+        // If backend returns empty response, show empty array
+        schools = [];
+      }
+      
+      const convertedInstitutions = schools.map(convertToInstitution);
       setInstitutions(convertedInstitutions);
     } catch (error) {
       console.error('Search error:', error);
-      setSearchError('Failed to search institutions. Please try again.');
+      setSearchError('Search service unavailable. Please try again later.');
       setInstitutions([]);
     } finally {
       setIsLoading(false);

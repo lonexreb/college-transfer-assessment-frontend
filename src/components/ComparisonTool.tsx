@@ -165,9 +165,38 @@ const ComparisonTool = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Streaming response error:', errorText);
+        
+        // Handle the case where backend returns a simple message
+        if (response.status === 200) {
+          const data = JSON.parse(errorText);
+          if (data.message) {
+            setError(data.message);
+            setIsLoading(false);
+            return;
+          }
+        }
         throw new Error(`Failed to start streaming: ${response.status} ${errorText}`);
       }
 
+      // Check if response is streaming or JSON
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        // Handle non-streaming JSON response
+        const data = await response.json();
+        if (data.message) {
+          setError(`Backend response: ${data.message}`);
+        } else {
+          setComparisonResult({
+            schools_data: data.schools_data || [],
+            ai_report: data.ai_report || 'Comparison endpoint is not fully implemented yet.'
+          });
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
@@ -225,7 +254,7 @@ const ComparisonTool = () => {
 
     } catch (error) {
       console.error('Streaming comparison error:', error);
-      setError('Failed to compare schools. Please try again.');
+      setError('Comparison service is not fully implemented yet. Please check back later.');
       setIsLoading(false);
     }
   };
