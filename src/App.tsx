@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AssessmentWizard from "./components/AssessmentWizard";
 import ReportDisplay from "./components/ReportDisplay";
 import Dashboard from "./components/Dashboard";
@@ -27,7 +27,7 @@ const App = () => (
               <Route path="/comparison" element={<ComparisonTool />} />
               <Route path="/report/:id" element={<ReportDisplay />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </ProtectedRoute>
         </BrowserRouter>
