@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User } from "lucide-react";
+import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, BarChart3 } from "lucide-react";
 import { mockAssessments } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 
