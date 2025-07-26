@@ -32,6 +32,8 @@ const Dashboard = () => {
   };
 
   const handleViewComparison = (comparison: any) => {
+    // Store the comparison data for viewing
+    sessionStorage.setItem('viewComparison', JSON.stringify(comparison));
     navigate('/comparison');
   };
   const [comparisons, setComparisons] = useState<Comparison[]>([]);
