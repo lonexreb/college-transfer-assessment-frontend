@@ -65,8 +65,49 @@ const ComparisonTool = () => {
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load assessment config from wizard if available and start streaming
+  // Load assessment config from wizard or saved comparison for viewing
   useEffect(() => {
+    // Check for saved comparison to view
+    const viewComparison = sessionStorage.getItem('viewComparison');
+    if (viewComparison) {
+      try {
+        const comparison = JSON.parse(viewComparison);
+        sessionStorage.removeItem('viewComparison');
+        
+        // Set the schools and weights from the saved comparison
+        const newSelectedSchools = comparison.schools.map((name: string, index: number) => ({
+          id: `saved-${index}`,
+          name: name,
+          state: 'Unknown',
+          type: 'Unknown',
+          enrollmentSize: 'Unknown'
+        }));
+
+        // Pad with nulls to match the expected array length
+        while (newSelectedSchools.length < 3) {
+          newSelectedSchools.push(null);
+        }
+
+        setSelectedSchools(newSelectedSchools);
+        setWeights(comparison.weights);
+        
+        // Set the existing results without making new API calls
+        setComparisonResult({
+          schools_data: comparison.schoolsData,
+          ai_report: comparison.aiReport
+        });
+        
+        if (comparison.presentationResult) {
+          setPresentationResult(comparison.presentationResult);
+        }
+        
+        return; // Exit early since we're viewing a saved comparison
+      } catch (error) {
+        console.error('Failed to parse saved comparison:', error);
+      }
+    }
+
+    // Check for assessment config from wizard
     const storedConfig = sessionStorage.getItem('assessmentConfig');
     if (storedConfig) {
       try {
