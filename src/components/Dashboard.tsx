@@ -1,12 +1,14 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Calendar, BarChart3, Users } from "lucide-react";
-import { mockAssessments } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User } from "lucide-react";
+import { mockAssessments } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const completedAssessments = mockAssessments.filter(a => a.status === 'completed');
   const draftAssessments = mockAssessments.filter(a => a.status === 'draft');
 
@@ -30,6 +32,15 @@ const Dashboard = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error("Failed to logout", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -41,6 +52,21 @@ const Dashboard = () => {
               <p className="text-muted-foreground mt-2">
                 Compare and analyze college transfer credit policies
               </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span>{currentUser?.email}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </Button>
             </div>
             <div className="flex gap-3">
               <Button onClick={handleCreateAssessment} className="bg-primary hover:bg-primary-hover">
@@ -81,7 +107,7 @@ const Dashboard = () => {
                   <p className="text-sm font-medium text-muted-foreground">Completed</p>
                   <p className="text-2xl font-bold text-foreground">{completedAssessments.length}</p>
                 </div>
-                <BarChart3 className="w-8 h-8 text-success" />
+                <TrendingUp className="w-8 h-8 text-success" />
               </div>
             </CardContent>
           </Card>
@@ -93,7 +119,7 @@ const Dashboard = () => {
                   <p className="text-sm font-medium text-muted-foreground">Drafts</p>
                   <p className="text-2xl font-bold text-foreground">{draftAssessments.length}</p>
                 </div>
-                <Calendar className="w-8 h-8 text-warning" />
+                <CalendarDays className="w-8 h-8 text-warning" />
               </div>
             </CardContent>
           </Card>
