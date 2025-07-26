@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SchoolData {
   name: string;
@@ -42,6 +44,7 @@ interface ComparisonResponse {
 
 const ComparisonTool = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [selectedSchools, setSelectedSchools] = useState<(Institution | null)[]>([null, null, null]);
   const [weights, setWeights] = useState<ComparisonWeights>({
     transfer_navigation: 20,
@@ -60,6 +63,7 @@ const ComparisonTool = () => {
     path: string;
     edit_path: string;
   } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load assessment config from wizard if available and start streaming
   useEffect(() => {
@@ -69,7 +73,7 @@ const ComparisonTool = () => {
         const config = JSON.parse(storedConfig);
         // Clear the stored config after loading
         sessionStorage.removeItem('assessmentConfig');
-        
+
         // Set the schools and weights from the config
         const newSelectedSchools = config.schoolNames.map((name: string, index: number) => ({
           id: `config-${index}`,
@@ -78,18 +82,18 @@ const ComparisonTool = () => {
           type: 'Unknown',
           enrollmentSize: 'Unknown'
         }));
-        
+
         // Pad with nulls to match the expected array length
         while (newSelectedSchools.length < 3) {
           newSelectedSchools.push(null);
         }
-        
+
         setSelectedSchools(newSelectedSchools);
         setWeights(config.weights);
-        
+
         // Automatically start the comparison
         handleStreamingCompare(config.schoolNames, config.weights);
-        
+
       } catch (error) {
         console.error('Failed to parse stored assessment config:', error);
       }
@@ -106,9 +110,9 @@ const ComparisonTool = () => {
         schools: schoolNames,
         weights: compareWeights
       };
-      
+
       console.log('Making streaming POST request:', requestBody);
-      
+
       const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare-stream', {
         method: 'POST',
         headers: {
@@ -125,27 +129,27 @@ const ComparisonTool = () => {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
+
       if (!reader) {
         throw new Error('No response body reader available');
       }
 
       let buffer = '';
-      
+
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
-        
+
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               switch(data.type) {
                 case 'schools_data':
                   console.log('Schools data received:', data.data);
@@ -154,7 +158,7 @@ const ComparisonTool = () => {
                     schools_data: data.data
                   }));
                   break;
-                  
+
                 case 'ai_chunk':
                   console.log('AI chunk received:', data.data);
                   setComparisonResult(prev => ({
@@ -162,12 +166,12 @@ const ComparisonTool = () => {
                     ai_report: prev.ai_report + data.data
                   }));
                   break;
-                  
+
                 case 'complete':
                   console.log('Stream complete');
                   setIsLoading(false);
                   break;
-                  
+
                 default:
                   console.log('Unknown data type:', data.type);
               }
@@ -177,7 +181,7 @@ const ComparisonTool = () => {
           }
         }
       }
-      
+
     } catch (error) {
       console.error('Streaming comparison error:', error);
       setError('Failed to compare schools. Please try again.');
@@ -217,7 +221,7 @@ const ComparisonTool = () => {
 
   const handleCompare = async () => {
     const validSchools = selectedSchools.filter(school => school !== null);
-    
+
     if (validSchools.length < 2) {
       setError("Please select at least 2 schools to compare");
       return;
@@ -282,6 +286,35 @@ const ComparisonTool = () => {
     }
   };
 
+  const saveToFirestore = async () => {
+    if (!comparisonResult || !comparisonResult.ai_report || !currentUser) return;
+
+    setIsSaving(true);
+    try {
+      const comparisonData = {
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        schools: selectedSchools.map(school => school?.name),
+        weights: weights,
+        aiReport: comparisonResult.ai_report,
+        schoolsData: comparisonResult.schools_data,
+        presentationResult: presentationResult,
+        createdAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, "comparisons"), comparisonData);
+      console.log("Document written with ID: ", docRef.id);
+
+      // You can add a toast notification here if you have toast setup
+      alert("Comparison saved successfully!");
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      alert("Failed to save comparison. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -340,7 +373,7 @@ const ComparisonTool = () => {
                     )}
                   </div>
                 ))}
-                
+
                 {selectedSchools.length < 5 && (
                   <Button
                     variant="outline"
@@ -381,9 +414,9 @@ const ComparisonTool = () => {
                     />
                   </div>
                 ))}
-                
+
                 <Separator />
-                
+
                 <div className="text-center">
                   <Button
                     onClick={handleCompare}
@@ -497,26 +530,48 @@ const ComparisonTool = () => {
                       <CardTitle>AI Analysis Report</CardTitle>
                       <div className="flex gap-2">
                         {comparisonResult && comparisonResult.ai_report && !presentationResult && (
-                          <Button
-                            onClick={handleGeneratePresentation}
-                            disabled={isGeneratingPresentation}
-                            variant="outline"
-                            size="sm"
-                          >
-                            {isGeneratingPresentation ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <FileText className="w-4 h-4 mr-2" />
-                                Generate Presentation
-                              </>
-                            )}
-                          </Button>
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={handleGeneratePresentation}
+                              disabled={isGeneratingPresentation}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {isGeneratingPresentation ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  Generate Presentation
+                                </>
+                              )}
+                            </Button>
+
+                            <Button
+                              onClick={saveToFirestore}
+                              disabled={isSaving || !currentUser}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {isSaving ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4 mr-2" />
+                                  Save Comparison
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         )}
-                        
+
                         {presentationResult && (
                           <Button
                             onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
