@@ -43,6 +43,18 @@ const Dashboard = () => {
   const [presentationCount, setPresentationCount] = useState(0);
   const [weeklyComparisons, setWeeklyComparisons] = useState(0);
 
+  const fetchPresentationCount = async () => {
+    try {
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/v1/ppt/list/presentations');
+      if (response.ok) {
+        const data = await response.json();
+        setPresentationCount(data.presentations?.length || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching presentation count:", error);
+    }
+  };
+
   useEffect(() => {
     const fetchComparisons = async () => {
       if (!currentUser) return;
@@ -62,7 +74,6 @@ const Dashboard = () => {
 
         const comparisonsData: Comparison[] = [];
         const institutionSet = new Set<string>();
-        let presentationsWithResults = 0;
         let thisWeekComparisons = 0;
         
         const oneWeekAgo = new Date();
@@ -86,11 +97,6 @@ const Dashboard = () => {
           
           comparisonsData.push(comparison);
 
-          // Count presentations
-          if (data.presentationResult) {
-            presentationsWithResults++;
-          }
-
           // Count comparisons from this week
           if (data.createdAt) {
             const createdDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
@@ -108,7 +114,6 @@ const Dashboard = () => {
         console.log("Final comparisons data:", comparisonsData);
         setComparisons(comparisonsData);
         setTotalInstitutions(institutionSet.size);
-        setPresentationCount(presentationsWithResults);
         setWeeklyComparisons(thisWeekComparisons);
       } catch (error) {
         console.error("Error fetching comparisons:", error);
@@ -123,7 +128,6 @@ const Dashboard = () => {
 
           const comparisonsData: Comparison[] = [];
           const institutionSet = new Set<string>();
-          let presentationsWithResults = 0;
           let thisWeekComparisons = 0;
           
           const oneWeekAgo = new Date();
@@ -144,11 +148,6 @@ const Dashboard = () => {
             };
             
             comparisonsData.push(comparison);
-
-            // Count presentations
-            if (data.presentationResult) {
-              presentationsWithResults++;
-            }
 
             // Count comparisons from this week
             if (data.createdAt) {
@@ -172,7 +171,6 @@ const Dashboard = () => {
 
           setComparisons(comparisonsData);
           setTotalInstitutions(institutionSet.size);
-          setPresentationCount(presentationsWithResults);
           setWeeklyComparisons(thisWeekComparisons);
         } catch (simpleError) {
           console.error("Simple query also failed:", simpleError);
@@ -183,6 +181,7 @@ const Dashboard = () => {
     };
 
     fetchComparisons();
+    fetchPresentationCount();
   }, [currentUser]);
 
   const formatDate = (timestamp: any) => {
