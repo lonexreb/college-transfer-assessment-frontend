@@ -33,18 +33,23 @@ const Dashboard = () => {
 
       try {
         setIsLoading(true);
+        console.log("Fetching all comparisons (admin portal)");
+
+        // Query all comparisons without user filtering
         const q = query(
           collection(db, "comparisons"),
-          where("userId", "==", currentUser.uid),
           orderBy("createdAt", "desc")
         );
-        
+
         const querySnapshot = await getDocs(q);
+        console.log("Total documents found:", querySnapshot.size);
+
         const comparisonsData: Comparison[] = [];
         const institutionSet = new Set<string>();
-        
+
         querySnapshot.forEach((doc) => {
           const data = doc.data();
+          console.log("Processing document:", doc.id, data);
           comparisonsData.push({
             id: doc.id,
             schools: data.schools || [],
@@ -56,17 +61,61 @@ const Dashboard = () => {
             userId: data.userId,
             userEmail: data.userEmail
           });
-          
+
           // Add schools to institution set for counting unique institutions
           if (data.schools) {
             data.schools.forEach((school: string) => institutionSet.add(school));
           }
         });
-        
+
+        console.log("Final comparisons data:", comparisonsData);
         setComparisons(comparisonsData);
         setTotalInstitutions(institutionSet.size);
       } catch (error) {
         console.error("Error fetching comparisons:", error);
+
+        // If the ordered query fails due to missing index, try without orderBy
+        try {
+          console.log("Trying query without orderBy...");
+          const simpleQuery = query(collection(db, "comparisons"));
+
+          const querySnapshot = await getDocs(simpleQuery);
+          console.log("Simple query documents:", querySnapshot.size);
+
+          const comparisonsData: Comparison[] = [];
+          const institutionSet = new Set<string>();
+
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            comparisonsData.push({
+              id: doc.id,
+              schools: data.schools || [],
+              weights: data.weights || {},
+              aiReport: data.aiReport || "",
+              schoolsData: data.schoolsData || [],
+              presentationResult: data.presentationResult,
+              createdAt: data.createdAt,
+              userId: data.userId,
+              userEmail: data.userEmail
+            });
+
+            if (data.schools) {
+              data.schools.forEach((school: string) => institutionSet.add(school));
+            }
+          });
+
+          // Sort by createdAt on client side
+          comparisonsData.sort((a, b) => {
+            const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return bDate.getTime() - aDate.getTime();
+          });
+
+          setComparisons(comparisonsData);
+          setTotalInstitutions(institutionSet.size);
+        } catch (simpleError) {
+          console.error("Simple query also failed:", simpleError);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -77,7 +126,7 @@ const Dashboard = () => {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "Unknown date";
-    
+
     // Handle Firestore timestamp
     if (timestamp.toDate) {
       return timestamp.toDate().toLocaleDateString('en-US', {
@@ -86,7 +135,7 @@ const Dashboard = () => {
         day: 'numeric'
       });
     }
-    
+
     // Handle regular date string
     return new Date(timestamp).toLocaleDateString('en-US', {
       year: 'numeric',
