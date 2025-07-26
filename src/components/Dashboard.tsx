@@ -157,7 +157,7 @@ const Dashboard = () => {
     });
   };
 
-  
+
 
   const handleLogout = async () => {
     try {
@@ -198,7 +198,7 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="admin">Admin Management</TabsTrigger>
           </TabsList>
