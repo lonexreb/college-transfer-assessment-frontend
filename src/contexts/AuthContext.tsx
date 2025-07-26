@@ -12,6 +12,7 @@ import { auth } from '@/lib/firebase';
 
 interface AuthContextType {
   currentUser: User | null;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,6 +27,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   function signup(email: string, password: string) {
@@ -40,9 +42,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return signOut(auth);
   }
 
+  const checkAdminClaims = async (user: User | null) => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    try {
+      // Get fresh token to ensure we have latest custom claims
+      const tokenResult = await user.getIdTokenResult(true);
+      setIsAdmin(!!tokenResult.claims.admin);
+    } catch (error) {
+      console.error('Error checking admin claims:', error);
+      setIsAdmin(false);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      await checkAdminClaims(user);
       setLoading(false);
     });
 
@@ -51,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     currentUser,
+    isAdmin,
     login,
     signup,
     logout,
