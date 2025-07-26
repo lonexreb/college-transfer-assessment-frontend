@@ -1,0 +1,108 @@
+
+from fastapi import APIRouter, HTTPException, Depends, Header, Form
+from typing import Optional
+import firebase_admin
+from firebase_admin import credentials, auth
+import os
+
+# Initialize Firebase Admin (only once)
+if not firebase_admin._apps:
+    try:
+        # Use the service account key file
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized successfully")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+        print("Using mock authentication for development")
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+# In-memory admin store (you might want to move this to a database later)
+ADMIN_EMAILS = [
+    "admin@example.com",
+    "nealconwayp@gmail.com",
+]
+
+async def verify_firebase_token(authorization: Optional[str] = Header(None)):
+    """Verify Firebase ID token and return user email"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    try:
+        # Extract token from "Bearer <token>"
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization format")
+        
+        token = authorization.split(" ")[1]
+        
+        # Verify the token with Firebase Admin
+        decoded_token = auth.verify_id_token(token)
+        user_email = decoded_token.get('email')
+        
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Email not found in token")
+            
+        return user_email
+    
+    except Exception as e:
+        print(f"Firebase auth error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+@router.get("/check")
+async def check_admin(current_user_email: str = Depends(verify_firebase_token)):
+    """Check if current user is an admin"""
+    is_admin = current_user_email in ADMIN_EMAILS
+    return {"isAdmin": is_admin, "email": current_user_email}
+
+@router.post("/add")
+async def add_admin(
+    email: str = Form(...),
+    current_user_email: str = Depends(verify_firebase_token)
+):
+    """Add a new admin (admin only)"""
+    if current_user_email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    if email not in ADMIN_EMAILS:
+        ADMIN_EMAILS.append(email)
+
+    return {"message": "Admin added successfully", "email": email}
+
+@router.post("/remove")
+async def remove_admin(
+    email: str = Form(...),
+    current_user_email: str = Depends(verify_firebase_token)
+):
+    """Remove an admin (admin only)"""
+    if current_user_email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    if email in ADMIN_EMAILS:
+        ADMIN_EMAILS.remove(email)
+
+    return {"message": "Admin removed successfully", "email": email}
+
+@router.get("/list")
+async def list_admins(current_user_email: str = Depends(verify_firebase_token)):
+    """List all admins (admin only)"""
+    if current_user_email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    from datetime import datetime
+    admins = [
+        {
+            "email": email,
+            "addedAt": datetime.now().isoformat(),
+            "addedBy": "system"
+        }
+        for email in ADMIN_EMAILS
+    ]
+
+    return {"admins": admins}
