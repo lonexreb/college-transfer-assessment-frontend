@@ -8,6 +8,7 @@ import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, Bar
 import { mockAssessments } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import AdminManager from "@/components/AdminManager";
+import PresentationManager from "@/components/PresentationManager";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 
@@ -198,8 +199,9 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="presentations">Presentations</TabsTrigger>
             <TabsTrigger value="admin">Admin Management</TabsTrigger>
           </TabsList>
 
@@ -336,6 +338,10 @@ const Dashboard = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="presentations">
+            <PresentationManager />
           </TabsContent>
 
           <TabsContent value="admin">
