@@ -25,19 +25,3 @@ externalPort = 8080
 [[ports]]
 localPort = 9005
 externalPort = 3000
-
-[workflows]
-runButton = "Run FastAPI"
-
-[[workflows.workflow]]
-name = "Run FastAPI"
-author = 2573195
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python setup_firebase.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
