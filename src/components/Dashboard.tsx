@@ -40,6 +40,8 @@ const Dashboard = () => {
   const [comparisons, setComparisons] = useState<Comparison[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalInstitutions, setTotalInstitutions] = useState(0);
+  const [presentationCount, setPresentationCount] = useState(0);
+  const [weeklyComparisons, setWeeklyComparisons] = useState(0);
 
   useEffect(() => {
     const fetchComparisons = async () => {
@@ -60,11 +62,17 @@ const Dashboard = () => {
 
         const comparisonsData: Comparison[] = [];
         const institutionSet = new Set<string>();
+        let presentationsWithResults = 0;
+        let thisWeekComparisons = 0;
+        
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           console.log("Processing document:", doc.id, data);
-          comparisonsData.push({
+          
+          const comparison = {
             id: doc.id,
             schools: data.schools || [],
             weights: data.weights || {},
@@ -74,7 +82,22 @@ const Dashboard = () => {
             createdAt: data.createdAt,
             userId: data.userId,
             userEmail: data.userEmail
-          });
+          };
+          
+          comparisonsData.push(comparison);
+
+          // Count presentations
+          if (data.presentationResult) {
+            presentationsWithResults++;
+          }
+
+          // Count comparisons from this week
+          if (data.createdAt) {
+            const createdDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+            if (createdDate >= oneWeekAgo) {
+              thisWeekComparisons++;
+            }
+          }
 
           // Add schools to institution set for counting unique institutions
           if (data.schools) {
@@ -85,6 +108,8 @@ const Dashboard = () => {
         console.log("Final comparisons data:", comparisonsData);
         setComparisons(comparisonsData);
         setTotalInstitutions(institutionSet.size);
+        setPresentationCount(presentationsWithResults);
+        setWeeklyComparisons(thisWeekComparisons);
       } catch (error) {
         console.error("Error fetching comparisons:", error);
 
@@ -98,10 +123,15 @@ const Dashboard = () => {
 
           const comparisonsData: Comparison[] = [];
           const institutionSet = new Set<string>();
+          let presentationsWithResults = 0;
+          let thisWeekComparisons = 0;
+          
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            comparisonsData.push({
+            const comparison = {
               id: doc.id,
               schools: data.schools || [],
               weights: data.weights || {},
@@ -111,7 +141,22 @@ const Dashboard = () => {
               createdAt: data.createdAt,
               userId: data.userId,
               userEmail: data.userEmail
-            });
+            };
+            
+            comparisonsData.push(comparison);
+
+            // Count presentations
+            if (data.presentationResult) {
+              presentationsWithResults++;
+            }
+
+            // Count comparisons from this week
+            if (data.createdAt) {
+              const createdDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+              if (createdDate >= oneWeekAgo) {
+                thisWeekComparisons++;
+              }
+            }
 
             if (data.schools) {
               data.schools.forEach((school: string) => institutionSet.add(school));
@@ -127,6 +172,8 @@ const Dashboard = () => {
 
           setComparisons(comparisonsData);
           setTotalInstitutions(institutionSet.size);
+          setPresentationCount(presentationsWithResults);
+          setWeeklyComparisons(thisWeekComparisons);
         } catch (simpleError) {
           console.error("Simple query also failed:", simpleError);
         }
@@ -236,26 +283,26 @@ const Dashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Presentations</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{0}</div>
+                  <div className="text-2xl font-bold">{presentationCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    New comparisons created
+                    Generated presentations
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Growth</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">This Week</CardTitle>
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{0}%</div>
+                  <div className="text-2xl font-bold">{weeklyComparisons}</div>
                   <p className="text-xs text-muted-foreground">
-                    From last month
+                    New comparisons created
                   </p>
                 </CardContent>
               </Card>
