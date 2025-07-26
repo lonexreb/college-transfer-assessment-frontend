@@ -361,13 +361,23 @@ const PresentationManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {presentation.api_response?.edit_path && (
+                      <Button
+                        onClick={() => window.open(`https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev${presentation.api_response.edit_path}`, '_blank')}
+                        variant="default"
+                        size="sm"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                    )}
                     <Button
                       onClick={() => handleViewPresentation(presentation.firebase_id || presentation.id)}
                       variant="outline"
                       size="sm"
                     >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
+                      <FileText className="w-4 h-4 mr-1" />
+                      Details
                     </Button>
                     <Button
                       onClick={() => handleDeletePresentation(presentation.firebase_id || presentation.id)}
