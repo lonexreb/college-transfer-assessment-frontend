@@ -42,18 +42,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return signOut(auth);
   }
 
-  const checkAdminClaims = async (user: User | null) => {
+  const checkAdminStatus = async (user: User | null) => {
     if (!user) {
       setIsAdmin(false);
       return;
     }
 
     try {
-      // Get fresh token to ensure we have latest custom claims
-      const tokenResult = await user.getIdTokenResult(true);
-      setIsAdmin(!!tokenResult.claims.admin);
+      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/admin/check', {
+        headers: {
+          'Authorization': `Bearer ${await user.getIdToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin);
+      } else {
+        setIsAdmin(false);
+      }
     } catch (error) {
-      console.error('Error checking admin claims:', error);
+      console.error('Error checking admin status:', error);
       setIsAdmin(false);
     }
   };
@@ -61,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      await checkAdminClaims(user);
+      await checkAdminStatus(user);
       setLoading(false);
     });
 

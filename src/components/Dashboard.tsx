@@ -3,8 +3,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, BarChart3, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, BarChart3, Shield } from "lucide-react";
+import { mockAssessments } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
+import AdminManager from "@/components/AdminManager";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 
@@ -166,198 +169,178 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-8">
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Transfer Friendliness Assessment</h1>
-              <p className="text-muted-foreground mt-2">
-                Compare and analyze college transfer credit policies
-              </p>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-8 h-8 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">DegreeW Admin</h1>
+                <p className="text-sm text-muted-foreground">College Comparison Platform</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <User className="w-4 h-4" />
                 <span>{currentUser?.email}</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
                 Logout
-              </Button>
-            </div>
-            <div className="flex gap-3">
-              <Button onClick={handleCreateAssessment} className="bg-primary hover:bg-primary-hover">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Assessment
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/comparison')}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Compare Schools
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Comparisons</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : comparisons.length}
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="admin">Admin Management</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Comparisons</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{comparisons.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Saved college comparisons
                   </p>
-                </div>
-                <FileText className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">With Presentations</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : comparisons.filter(c => c.presentationResult).length}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Unique Institutions</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalInstitutions}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Different schools compared
                   </p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-success" />
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Recent (7 days)</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-                      comparisons.filter(c => {
-                        const createdDate = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
-                        const sevenDaysAgo = new Date();
-                        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                        return createdDate > sevenDaysAgo;
-                      }).length
-                    }
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">This Month</CardTitle>
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    New comparisons created
                   </p>
-                </div>
-                <CalendarDays className="w-8 h-8 text-warning" />
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Institutions</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : totalInstitutions}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Growth</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{0}%</div>
+                  <p className="text-xs text-muted-foreground">
+                    From last month
                   </p>
-                </div>
-                <Users className="w-8 h-8 text-accent-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Recent Comparisons */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Comparisons</CardTitle>
-            <CardDescription>
-              View and manage your school comparison analyses
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-8 h-8 animate-spin" />
-                <span className="ml-2">Loading comparisons...</span>
-              </div>
-            ) : comparisons.length === 0 ? (
-              <div className="text-center p-8">
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No comparisons yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start by creating your first school comparison analysis
-                </p>
-                <Button onClick={handleCreateAssessment}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create First Comparison
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {comparisons.map((comparison) => (
-                  <div key={comparison.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-foreground">
-                          {comparison.schools.slice(0, 2).join(" vs ")}
-                          {comparison.schools.length > 2 && ` +${comparison.schools.length - 2} more`}
-                        </h3>
-                        <Badge variant="default">
-                          Completed
-                        </Badge>
-                        {comparison.presentationResult && (
-                          <Badge variant="secondary">
-                            Has Presentation
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>{comparison.schools.length} schools compared</span>
-                        <span>•</span>
-                        <span>Created {formatDate(comparison.createdAt)}</span>
-                        {comparison.presentationResult && (
-                          <>
-                            <span>•</span>
-                            <span>Presentation ready</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewComparison(comparison)}
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Analysis
-                      </Button>
-                      {comparison.presentationResult && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${comparison.presentationResult.edit_path}`, '_blank')}
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Open Presentation
-                        </Button>
-                      )}
-                    </div>
+            {/* Actions */}
+            <div className="flex gap-4">
+              <Button onClick={() => {}} className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                New Comparison
+              </Button>
+            </div>
+
+            {/* Recent Comparisons */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Comparisons</CardTitle>
+                <CardDescription>
+                  Latest college comparisons from all users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-4">Loading comparisons...</div>
+                ) : comparisons.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">No comparisons yet</h3>
+                    <p className="text-sm mb-4">
+                      Get started by creating your first college comparison.
+                    </p>
+                    <Button onClick={() => {}}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Comparison
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comparisons.map((comparison) => (
+                      <div
+                        key={comparison.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium mb-1">
+                            {comparison.schools.join(" vs ")}
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-4">
+                            <span>
+                              Created: {comparison.createdAt ? new Date(comparison.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown'}
+                            </span>
+                            {comparison.userEmail && (
+                              <span>By: {comparison.userEmail}</span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {comparison.schools.length} schools
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {comparison.aiReport && (
+                            <Badge variant="outline">AI Report</Badge>
+                          )}
+                          {comparison.presentationResult && (
+                            <Badge variant="secondary">Presentation</Badge>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {}}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="admin">
+            <AdminManager />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 };
