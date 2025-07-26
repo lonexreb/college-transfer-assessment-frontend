@@ -1,0 +1,146 @@
+from fastapi import APIRouter, HTTPException, Form
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
+import uuid
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for presentations")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api/v1/ppt", tags=["presentation"])
+
+@router.post("/generate/presentation")
+async def generate_presentation(
+    prompt: str = Form(...),
+    n_slides: int = Form(5),
+    language: str = Form("English"),
+    theme: str = Form("light"),
+    export_as: str = Form("pptx")
+):
+    """Generate a presentation using external API and save to Firebase"""
+    print("Generating presentation")
+
+    if not prompt:
+        raise HTTPException(status_code=400, detail='Prompt is required')
+
+    try:
+        # Call external API to generate presentation
+        response = requests.post("http://tramway.proxy.rlwy.net:38813/api/v1/ppt/generate/presentation",
+            data={
+                "prompt": prompt,
+                "n_slides": str(n_slides),
+                "language": language,
+                "theme": theme,
+                "export_as": export_as
+            }
+        )
+        response.raise_for_status()
+        presentation_data = response.json()
+
+        # Save to Firebase Firestore
+        try:
+            presentation_id = str(uuid.uuid4())
+            firebase_data = {
+                "id": presentation_id,
+                "prompt": prompt,
+                "n_slides": n_slides,
+                "language": language,
+                "theme": theme,
+                "export_as": export_as,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "api_response": presentation_data
+            }
+
+            db.collection('presentations').document(presentation_id).set(firebase_data)
+            print(f"Presentation saved to Firebase with ID: {presentation_id}")
+
+            # Add the Firebase ID to the response
+            presentation_data["firebase_id"] = presentation_id
+
+        except Exception as firebase_error:
+            print(f"Error saving to Firebase: {firebase_error}")
+            # Continue without failing the request
+
+        return presentation_data
+
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f'Presentation API request failed: {str(e)}')
+
+@router.get("/list/presentations")
+async def list_presentations():
+    """List all presentation links from Firebase"""
+    print("Fetching presentation list from Firebase")
+
+    try:
+        presentations_ref = db.collection('presentations')
+        docs = presentations_ref.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+
+        presentations = []
+        for doc in docs:
+            presentation_data = doc.to_dict()
+            # Convert Firestore timestamp to ISO format
+            if 'created_at' in presentation_data and presentation_data['created_at']:
+                presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+            presentations.append(presentation_data)
+
+        return {"presentations": presentations}
+
+    except Exception as e:
+        print(f"Error fetching presentations from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentations: {str(e)}')
+
+@router.get("/presentation/{presentation_id}")
+async def get_presentation(presentation_id: str):
+    """Get a specific presentation by ID from Firebase"""
+    print(f"Fetching presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        presentation_data = doc.to_dict()
+        # Convert Firestore timestamp to ISO format
+        if 'created_at' in presentation_data and presentation_data['created_at']:
+            presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+
+        return presentation_data
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error fetching presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentation: {str(e)}')
+
+@router.delete("/presentation/{presentation_id}")
+async def delete_presentation(presentation_id: str):
+    """Delete a specific presentation by ID from Firebase"""
+    print(f"Deleting presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        doc_ref.delete()
+        return {"message": "Presentation deleted successfully", "id": presentation_id}
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error deleting presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to delete presentation: {str(e)}')
