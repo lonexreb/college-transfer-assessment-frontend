@@ -259,7 +259,7 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <Button onClick={() => {}} className="flex items-center gap-2">
+              <Button onClick={handleCreateAssessment} className="flex items-center gap-2">
                 <Plus className="w-4 h-4" />
                 New Comparison
               </Button>
@@ -283,7 +283,7 @@ const Dashboard = () => {
                     <p className="text-sm mb-4">
                       Get started by creating your first college comparison.
                     </p>
-                    <Button onClick={() => {}}>
+                    <Button onClick={handleCreateAssessment}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Comparison
                     </Button>
@@ -322,7 +322,7 @@ const Dashboard = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {}}
+                            onClick={() => handleViewComparison(comparison)}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
