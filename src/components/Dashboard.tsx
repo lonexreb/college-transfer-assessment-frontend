@@ -24,8 +24,16 @@ interface Comparison {
 }
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleCreateAssessment = () => {
+    navigate('/assessment/new');
+  };
+
+  const handleViewComparison = (comparison: any) => {
+    navigate('/comparison');
+  };
   const [comparisons, setComparisons] = useState<Comparison[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalInstitutions, setTotalInstitutions] = useState(0);
@@ -147,15 +155,7 @@ const Dashboard = () => {
     });
   };
 
-  const handleCreateAssessment = () => {
-    navigate('/assessment/new');
-  };
-
-  const handleViewComparison = (comparison: Comparison) => {
-    // Store the comparison data in sessionStorage for viewing
-    sessionStorage.setItem('viewComparison', JSON.stringify(comparison));
-    navigate('/comparison');
-  };
+  
 
   const handleLogout = async () => {
     try {
