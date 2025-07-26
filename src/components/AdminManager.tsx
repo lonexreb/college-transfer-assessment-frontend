@@ -59,13 +59,15 @@ const AdminManager = () => {
 
     setLoading(true);
     try {
+      const formData = new FormData();
+      formData.append('email', newAdminEmail.trim());
+      
       const response = await fetch(`${API_BASE}/api/admin/add`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${await currentUser.getIdToken()}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
         },
-        body: JSON.stringify({ email: newAdminEmail.trim() })
+        body: formData
       });
 
       if (!response.ok) {
@@ -89,13 +91,15 @@ const AdminManager = () => {
 
     setLoading(true);
     try {
+      const formData = new FormData();
+      formData.append('email', email);
+      
       const response = await fetch(`${API_BASE}/api/admin/remove`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${await currentUser.getIdToken()}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
         },
-        body: JSON.stringify({ email })
+        body: formData
       });
 
       if (!response.ok) {
