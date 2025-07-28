@@ -599,27 +599,29 @@ const ComparisonTool = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle>AI Analysis Report</CardTitle>
                       <div className="flex gap-2">
-                        {comparisonResult && comparisonResult.ai_report && !presentationResult && (
+                        {comparisonResult && comparisonResult.ai_report && (
                           
                           <div className="flex gap-2">
-                            <Button
-                              onClick={handleGeneratePresentation}
-                              disabled={isGeneratingPresentation}
-                              variant="outline"
-                              size="sm"
-                            >
-                              {isGeneratingPresentation ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <FileText className="w-4 h-4 mr-2" />
-                                  Generate Presentation
-                                </>
-                              )}
-                            </Button>
+                            {!presentationResult && (
+                              <Button
+                                onClick={handleGeneratePresentation}
+                                disabled={isGeneratingPresentation}
+                                variant="outline"
+                                size="sm"
+                              >
+                                {isGeneratingPresentation ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    Generate Presentation
+                                  </>
+                                )}
+                              </Button>
+                            )}
 
                             <Button
                               onClick={saveToFirestore}
