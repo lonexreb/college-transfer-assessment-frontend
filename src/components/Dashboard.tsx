@@ -222,7 +222,7 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <img src="/src/components/logo.webp" alt="DegreeSight" className="h-8 w-auto object-contain" />
+              <img src="/logo.webp" alt="DegreeSight" className="h-8 w-auto object-contain" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">DegreeSight Admin</h1>
                 <p className="text-sm text-muted-foreground">College Comparison Platform</p>
