@@ -363,7 +363,7 @@ const PresentationManager = () => {
                   <div className="flex items-center gap-2">
                     {presentation.api_response?.edit_path && (
                       <Button
-                        onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentation.api_response.edit_path}`, '_blank')}
+                        onClick={() => window.open(`https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev${presentation.api_response.edit_path}`, '_blank')}
                         variant="default"
                         size="sm"
                       >
