@@ -154,7 +154,7 @@ const ComparisonTool = () => {
 
       console.log('Making streaming POST request:', requestBody);
 
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/compare-stream', {
+      const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/compare-stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

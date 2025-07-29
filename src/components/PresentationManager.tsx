@@ -50,7 +50,7 @@ const PresentationManager = () => {
     export_as: 'pptx'
   });
 
-  const API_BASE = 'https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev';
+  const API_BASE = 'https://degree-works-backend-hydrabeans.replit.app';
 
   const fetchPresentations = async () => {
     setLoading(true);
@@ -363,7 +363,7 @@ const PresentationManager = () => {
                   <div className="flex items-center gap-2">
                     {presentation.api_response?.edit_path && (
                       <Button
-                        onClick={() => window.open(`https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev${presentation.api_response.edit_path}`, '_blank')}
+                        onClick={() => window.open(`https://degree-works-backend-hydrabeans.replit.app${presentation.api_response.edit_path}`, '_blank')}
                         variant="default"
                         size="sm"
                       >
