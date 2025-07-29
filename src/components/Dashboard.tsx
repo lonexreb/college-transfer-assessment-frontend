@@ -224,7 +224,7 @@ const Dashboard = () => {
             <div className="flex items-center gap-2">
               <BarChart3 className="w-8 h-8 text-primary" />
               <div>
-                <h1 className="text-2xl font-bold text-foreground">DegreeW Admin</h1>
+                <h1 className="text-2xl font-bold text-foreground">Degree Site Admin</h1>
                 <p className="text-sm text-muted-foreground">College Comparison Platform</p>
               </div>
             </div>
