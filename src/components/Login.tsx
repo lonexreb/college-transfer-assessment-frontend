@@ -54,8 +54,8 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
           </CardTitle>
           <CardDescription className="text-center">
             {isSignupMode 
-              ? 'Sign up for admin access to the Degree Site'
-              : 'Sign in to access the Degree Site'
+              ? 'Sign up for admin access to DegreeSight'
+              : 'Sign in to access DegreeSight'
             }
           </CardDescription>
         </CardHeader>

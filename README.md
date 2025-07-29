@@ -1,4 +1,4 @@
-# Welcome to Degree Site
+# Welcome to DegreeSight
 
 ## Project info
 
