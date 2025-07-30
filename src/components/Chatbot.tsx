@@ -111,7 +111,7 @@ const Chatbot = () => {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 left-6 z-50">
+      <div className="fixed bottom-6 right-6 z-50">
         <Button
           onClick={() => setIsOpen(true)}
           className="h-14 w-14 rounded-full bg-primary hover:bg-primary-hover shadow-lg"
@@ -125,8 +125,8 @@ const Chatbot = () => {
 
   return (
     <div className={cn(
-      "fixed bottom-6 left-6 z-50 transition-all duration-300",
-      isMinimized ? "w-80 h-14" : "w-80 h-96"
+      "fixed bottom-6 right-6 z-50 transition-all duration-300",
+      isMinimized ? "w-80 h-14" : "w-80 h-[400px] max-h-[calc(100vh-3rem)]"
     )}>
       <Card className="h-full shadow-xl border">
         <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
