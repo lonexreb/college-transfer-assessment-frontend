@@ -59,6 +59,17 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
+      // Fetch the system context document
+      let systemContext = "";
+      try {
+        const contextResponse = await fetch('/SYSTEM_CONTEXT.md');
+        if (contextResponse.ok) {
+          systemContext = await contextResponse.text();
+        }
+      } catch (error) {
+        console.log('Could not load system context:', error);
+      }
+
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/chat', {
         method: 'POST',
         headers: {
@@ -66,7 +77,8 @@ const Chatbot = () => {
         },
         body: JSON.stringify({ 
           message: inputValue,
-          context: "transfer_assessment"
+          context: "transfer_assessment",
+          systemContext: systemContext
         }),
       });
 
