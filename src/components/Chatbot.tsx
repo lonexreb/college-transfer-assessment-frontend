@@ -66,7 +66,7 @@ const Chatbot = () => {
         },
         body: JSON.stringify({ 
           message: inputValue,
-          context: "transfer_assessment" // Add context for better RAG responses
+          context: "transfer_assessment"
         }),
       });
 
