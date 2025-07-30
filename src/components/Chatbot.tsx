@@ -126,9 +126,9 @@ const Chatbot = () => {
   return (
     <div className={cn(
       "fixed bottom-6 right-6 z-50 transition-all duration-300",
-      isMinimized ? "w-80 h-14" : "w-80 h-[400px] max-h-[calc(100vh-3rem)]"
+      isMinimized ? "w-80 h-14" : "w-80 max-h-[calc(100vh-4rem)]"
     )}>
-      <Card className="h-full shadow-xl border">
+      <Card className="h-full shadow-xl border flex flex-col" style={{ height: isMinimized ? '3.5rem' : 'min(400px, calc(100vh - 4rem))' }}>
         <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
           <CardTitle className="text-lg">Transfer Assistant</CardTitle>
           <div className="flex items-center gap-1">
@@ -152,8 +152,8 @@ const Chatbot = () => {
         </CardHeader>
         
         {!isMinimized && (
-          <CardContent className="flex flex-col h-full p-4 pt-0">
-            <ScrollArea className="flex-1 mb-4 pr-4">
+          <CardContent className="flex flex-col flex-1 p-4 pt-0 min-h-0">
+            <ScrollArea className="flex-1 mb-4 pr-4 min-h-0">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
