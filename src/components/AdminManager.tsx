@@ -115,7 +115,7 @@ const AdminManager = () => {
     } finally {
       setLoading(false);
     }
-  };h
+  };
 
   if (!isAdmin) {
     return (
