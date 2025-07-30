@@ -77,7 +77,7 @@ const Chatbot = () => {
         },
         body: JSON.stringify({ 
           message: inputValue,
-          context: "transfer_assessment",
+          context: "MAKE THE RESPONSE SHORT PLEASE",
           systemContext: systemContext
         }),
       });
