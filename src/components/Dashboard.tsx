@@ -45,7 +45,7 @@ const Dashboard = () => {
 
   const fetchPresentationCount = async () => {
     try {
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/v1/ppt/list/presentations');
+      const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/v1/ppt/list/presentations');
       if (response.ok) {
         const data = await response.json();
         setPresentationCount(data.presentations?.length || 0);

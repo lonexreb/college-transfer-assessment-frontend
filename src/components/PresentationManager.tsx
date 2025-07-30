@@ -363,7 +363,7 @@ const PresentationManager = () => {
                   <div className="flex items-center gap-2">
                     {presentation.api_response?.edit_path && (
                       <Button
-                        onClick={() => window.open(`https://degree-works-backend-hydrabeans.replit.app${presentation.api_response.edit_path}`, '_blank')}
+                        onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentation.api_response.edit_path}`, '_blank')}
                         variant="default"
                         size="sm"
                       >
