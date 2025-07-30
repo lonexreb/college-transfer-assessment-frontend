@@ -7,6 +7,7 @@ import AssessmentWizard from "./components/AssessmentWizard";
 import ReportDisplay from "./components/ReportDisplay";
 import Dashboard from "./components/Dashboard";
 import ComparisonTool from "./components/ComparisonTool";
+import Chatbot from "./components/Chatbot";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -29,6 +30,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <Chatbot />
           </ProtectedRoute>
         </BrowserRouter>
       </TooltipProvider>
