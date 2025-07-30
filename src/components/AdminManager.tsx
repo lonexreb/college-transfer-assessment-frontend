@@ -20,7 +20,7 @@ const AdminManager = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  const API_BASE = 'https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev';
+  const API_BASE = 'https://degree-site-frontend-hydrabeans.replit.app';
 
   const fetchAdmins = async () => {
     if (!isAdmin || !currentUser) return;
@@ -115,7 +115,7 @@ const AdminManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };h
 
   if (!isAdmin) {
     return (
