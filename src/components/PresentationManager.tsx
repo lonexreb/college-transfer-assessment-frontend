@@ -361,14 +361,14 @@ const PresentationManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {presentation.api_response?.edit_path && (
+                    {presentation.api_response?.static_pdf_link && (
                       <Button
-                        onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentation.api_response.edit_path}`, '_blank')}
+                        onClick={() => window.open(presentation.api_response.static_pdf_link, '_blank')}
                         variant="default"
                         size="sm"
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        View
+                        View PDF
                       </Button>
                     )}
                     <Button
