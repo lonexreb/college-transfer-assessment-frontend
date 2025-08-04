@@ -75,7 +75,7 @@ const PresentationManager = () => {
     fetchPresentations();
   }, []);
 
-  const handlegGeneratePresentation = async () => {
+  const handleGeneratePresentation = async () => {
     if (!formData.prompt.trim()) {
       setMessage({ type: 'error', text: 'Please enter a prompt' });
       return;
@@ -361,14 +361,14 @@ const PresentationManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {presentation.api_response?.static_pdf_link && (
+                    {presentation.api_response?.edit_path && (
                       <Button
-                        onClick={() => window.open(presentation.api_response.static_pdf_link, '_blank')}
+                        onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentation.api_response.edit_path}`, '_blank')}
                         variant="default"
                         size="sm"
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        View PDF
+                        View
                       </Button>
                     )}
                     <Button

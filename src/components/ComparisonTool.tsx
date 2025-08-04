@@ -646,15 +646,14 @@ const ComparisonTool = () => {
 
                         {presentationResult && (
                           <Button
-                            onClick={() => window.open(presentationResult.static_pdf_link, '_blank')}
+                            onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
                             variant="default"
                             size="sm"
                           >
                             <FileText className="w-4 h-4 mr-2" />
-                            View PDF
+                            View Presentation
                           </Button>
-                        )} 
-                        
+                        )}
                       </div>
                     </div>
                   </CardHeader>
