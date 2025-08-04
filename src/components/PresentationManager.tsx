@@ -75,7 +75,7 @@ const PresentationManager = () => {
     fetchPresentations();
   }, []);
 
-  const handleGeneratePresentation = async () => {
+  const handlegGeneratePresentation = async () => {
     if (!formData.prompt.trim()) {
       setMessage({ type: 'error', text: 'Please enter a prompt' });
       return;
