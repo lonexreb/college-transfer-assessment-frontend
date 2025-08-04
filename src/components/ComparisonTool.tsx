@@ -645,14 +645,31 @@ const ComparisonTool = () => {
                         )}
 
                         {presentationResult && (
-                          <Button
-                            onClick={() => window.open(presentationResult.static_pdf_link, '_blank')}
-                            variant="default"
-                            size="sm"
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View PDF
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => window.open(presentationResult.static_pdf_link, '_blank')}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View PDF
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = presentationResult.static_pdf_link;
+                                link.download = `comparison-presentation-${Date.now()}.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              variant="default"
+                              size="sm"
+                            >
+                              <FileText className="w-4 h-4 mr-2" />
+                              Download PDF
+                            </Button>
+                          </div>
                         )} 
                         
                       </div>
