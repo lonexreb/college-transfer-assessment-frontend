@@ -364,7 +364,31 @@ const PresentationManager = () => {
                     {presentation.api_response?.static_pdf_link && (
                       <div className="flex gap-1">
                         <Button
-                          onClick={() => window.open(presentation.api_response.static_pdf_link, '_blank')}
+                          onClick={() => {
+                            const pdfUrl = presentation.api_response.static_pdf_link;
+                            console.log('Opening PDF URL:', pdfUrl);
+                            
+                            // Check if URL is valid
+                            if (!pdfUrl || !pdfUrl.startsWith('http')) {
+                              setMessage({ type: 'error', text: 'Invalid PDF URL' });
+                              return;
+                            }
+                            
+                            // Test if the PDF is accessible
+                            fetch(pdfUrl, { method: 'HEAD' })
+                              .then(response => {
+                                if (response.ok) {
+                                  window.open(pdfUrl, '_blank');
+                                } else {
+                                  setMessage({ type: 'error', text: `PDF not accessible (${response.status})` });
+                                }
+                              })
+                              .catch(error => {
+                                console.error('PDF accessibility check failed:', error);
+                                // Try to open anyway in case of CORS issues
+                                window.open(pdfUrl, '_blank');
+                              });
+                          }}
                           variant="outline"
                           size="sm"
                         >
@@ -373,12 +397,46 @@ const PresentationManager = () => {
                         </Button>
                         <Button
                           onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = presentation.api_response.static_pdf_link;
-                            link.download = `presentation-${presentation.firebase_id || presentation.id}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            const pdfUrl = presentation.api_response.static_pdf_link;
+                            console.log('Downloading PDF URL:', pdfUrl);
+                            
+                            if (!pdfUrl || !pdfUrl.startsWith('http')) {
+                              setMessage({ type: 'error', text: 'Invalid PDF URL for download' });
+                              return;
+                            }
+                            
+                            // Try direct download
+                            fetch(pdfUrl)
+                              .then(response => {
+                                if (!response.ok) {
+                                  throw new Error(`HTTP ${response.status}`);
+                                }
+                                return response.blob();
+                              })
+                              .then(blob => {
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `presentation-${presentation.firebase_id || presentation.id}.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                window.URL.revokeObjectURL(url);
+                                setMessage({ type: 'success', text: 'PDF download started' });
+                              })
+                              .catch(error => {
+                                console.error('PDF download failed:', error);
+                                setMessage({ type: 'error', text: `Download failed: ${error.message}` });
+                                
+                                // Fallback to simple link approach
+                                const link = document.createElement('a');
+                                link.href = pdfUrl;
+                                link.download = `presentation-${presentation.firebase_id || presentation.id}.pdf`;
+                                link.target = '_blank';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              });
                           }}
                           variant="default"
                           size="sm"
