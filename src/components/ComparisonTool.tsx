@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save, Eye } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
