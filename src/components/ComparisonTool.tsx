@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save, Eye } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
@@ -645,87 +645,14 @@ const ComparisonTool = () => {
                         )}
 
                         {presentationResult && (
-                          <div className="flex gap-1">
-                            <Button
-                              onClick={() => {
-                                const pdfUrl = presentationResult.static_pdf_link;
-                                console.log('Opening comparison PDF URL:', pdfUrl);
-                                
-                                if (!pdfUrl || !pdfUrl.startsWith('http')) {
-                                  setError('Invalid PDF URL');
-                                  return;
-                                }
-                                
-                                // Test if the PDF is accessible
-                                fetch(pdfUrl, { method: 'HEAD' })
-                                  .then(response => {
-                                    if (response.ok) {
-                                      window.open(pdfUrl, '_blank');
-                                    } else {
-                                      setError(`PDF not accessible (${response.status})`);
-                                    }
-                                  })
-                                  .catch(error => {
-                                    console.error('PDF accessibility check failed:', error);
-                                    // Try to open anyway in case of CORS issues
-                                    window.open(pdfUrl, '_blank');
-                                  });
-                              }}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View PDF
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                const pdfUrl = presentationResult.static_pdf_link;
-                                console.log('Downloading comparison PDF URL:', pdfUrl);
-                                
-                                if (!pdfUrl || !pdfUrl.startsWith('http')) {
-                                  setError('Invalid PDF URL for download');
-                                  return;
-                                }
-                                
-                                // Try direct download
-                                fetch(pdfUrl)
-                                  .then(response => {
-                                    if (!response.ok) {
-                                      throw new Error(`HTTP ${response.status}`);
-                                    }
-                                    return response.blob();
-                                  })
-                                  .then(blob => {
-                                    const url = window.URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `comparison-presentation-${Date.now()}.pdf`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    window.URL.revokeObjectURL(url);
-                                  })
-                                  .catch(error => {
-                                    console.error('Comparison PDF download failed:', error);
-                                    setError(`Download failed: ${error.message}`);
-                                    
-                                    // Fallback to simple link approach
-                                    const link = document.createElement('a');
-                                    link.href = pdfUrl;
-                                    link.download = `comparison-presentation-${Date.now()}.pdf`;
-                                    link.target = '_blank';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                  });
-                              }}
-                              variant="default"
-                              size="sm"
-                            >
-                              <FileText className="w-4 h-4 mr-2" />
-                              Download PDF
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={() => window.open(presentationResult.static_pdf_link, '_blank')}
+                            variant="default"
+                            size="sm"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View PDF
+                          </Button>
                         )} 
                         
                       </div>
