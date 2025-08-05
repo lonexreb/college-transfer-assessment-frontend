@@ -420,7 +420,7 @@ const PresentationManager = () => {
                           size="sm"
                         >
                           <Eye className="w-4 h-4 mr-1" />
-                          View
+                          View PDF
                         </Button>
                         <Button
                           onClick={() => {
@@ -435,7 +435,7 @@ const PresentationManager = () => {
                           size="sm"
                         >
                           <Download className="w-4 h-4 mr-1" />
-                          Download
+                          Download PDF
                         </Button>
                       </div>
                     )}

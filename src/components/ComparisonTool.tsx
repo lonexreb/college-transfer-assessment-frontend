@@ -338,7 +338,7 @@ const ComparisonTool = () => {
       formData.append('theme', 'light');
       formData.append('export_as', 'pptx');
 
-      const response = await fetch('https://45d6fae9-a922-432b-b45b-6bf3e63633ed-00-1253eg8epuixe.picard.replit.dev/api/v1/ppt/generate/presentation', {
+      const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/v1/ppt/generate/presentation', {
         method: 'POST',
         body: formData,
       });
