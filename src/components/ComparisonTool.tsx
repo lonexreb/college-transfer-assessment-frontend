@@ -659,18 +659,15 @@ const ComparisonTool = () => {
                             </Button>
                             <Button
                               onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = `https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`;
-                                link.download = `comparison-presentation-${presentationResult.firebase_id}.pdf`;
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
+                                const shareableUrl = `https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`;
+                                navigator.clipboard.writeText(shareableUrl);
+                                // You may want to add a toast notification here
                               }}
                               variant="default"
                               size="sm"
                             >
                               <FileText className="w-4 h-4 mr-2" />
-                              Download PDF
+                              Copy Shareable Link
                             </Button>
                           </div>
                         )}

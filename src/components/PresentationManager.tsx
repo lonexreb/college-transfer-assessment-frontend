@@ -424,18 +424,15 @@ const PresentationManager = () => {
                         </Button>
                         <Button
                           onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = `${API_BASE}${presentation.static_url}`;
-                            link.download = `presentation-${presentation.firebase_id || presentation.id}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            const shareableUrl = `${API_BASE}${presentation.static_url}`;
+                            navigator.clipboard.writeText(shareableUrl);
+                            setMessage({ type: "success", text: "Shareable link copied to clipboard!" });
                           }}
                           variant="default"
                           size="sm"
                         >
                           <Download className="w-4 h-4 mr-1" />
-                          Download PDF
+                          Copy Shareable Link
                         </Button>
                       </div>
                     )}
