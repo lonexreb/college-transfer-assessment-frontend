@@ -1,25 +1,30 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useAuth } from '@/contexts/AuthContext';
-import { 
-  FileText, 
-  Plus, 
-  Trash2, 
-  Eye, 
-  RefreshCw, 
-  Loader2, 
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  FileText,
+  Plus,
+  Trash2,
+  Eye,
+  RefreshCw,
+  Loader2,
   Download,
   Calendar,
-  Layers
-} from 'lucide-react';
+  Layers,
+} from "lucide-react";
 
 interface Presentation {
   id: string;
@@ -38,19 +43,23 @@ const PresentationManager = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [selectedPresentation, setSelectedPresentation] = useState<Presentation | null>(null);
-  
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [selectedPresentation, setSelectedPresentation] =
+    useState<Presentation | null>(null);
+
   // Form state for creating new presentation
   const [formData, setFormData] = useState({
-    prompt: '',
+    prompt: "",
     n_slides: 5,
-    language: 'English',
-    theme: 'light',
-    export_as: 'pptx'
+    language: "English",
+    theme: "light",
+    export_as: "pptx",
   });
 
-  const API_BASE = 'https://degree-works-backend-hydrabeans.replit.app';
+  const API_BASE = "https://degree-works-backend-hydrabeans.replit.app";
 
   const fetchPresentations = async () => {
     setLoading(true);
@@ -58,14 +67,14 @@ const PresentationManager = () => {
       const response = await fetch(`${API_BASE}/api/v1/ppt/list/presentations`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch presentations');
+        throw new Error("Failed to fetch presentations");
       }
 
       const data = await response.json();
       setPresentations(data.presentations || []);
     } catch (error) {
-      console.error('Error fetching presentations:', error);
-      setMessage({ type: 'error', text: 'Failed to fetch presentations' });
+      console.error("Error fetching presentations:", error);
+      setMessage({ type: "error", text: "Failed to fetch presentations" });
     } finally {
       setLoading(false);
     }
@@ -77,7 +86,7 @@ const PresentationManager = () => {
 
   const handleGeneratePresentation = async () => {
     if (!formData.prompt.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a prompt' });
+      setMessage({ type: "error", text: "Please enter a prompt" });
       return;
     }
 
@@ -86,39 +95,48 @@ const PresentationManager = () => {
 
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append('prompt', formData.prompt.trim());
-      formDataToSend.append('n_slides', formData.n_slides.toString());
-      formDataToSend.append('language', formData.language);
-      formDataToSend.append('theme', formData.theme);
-      formDataToSend.append('export_as', formData.export_as);
+      formDataToSend.append("prompt", formData.prompt.trim());
+      formDataToSend.append("n_slides", formData.n_slides.toString());
+      formDataToSend.append("language", formData.language);
+      formDataToSend.append("theme", formData.theme);
+      formDataToSend.append("export_as", formData.export_as);
 
-      const response = await fetch(`${API_BASE}/api/v1/ppt/generate/presentation`, {
-        method: 'POST',
-        body: formDataToSend
-      });
+      const response = await fetch(
+        `${API_BASE}/api/v1/ppt/generate/presentation`,
+        {
+          method: "POST",
+          body: formDataToSend,
+        },
+      );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'Failed to generate presentation');
+        throw new Error(error.detail || "Failed to generate presentation");
       }
 
       const result = await response.json();
-      setMessage({ type: 'success', text: 'Presentation generated successfully!' });
-      
+      setMessage({
+        type: "success",
+        text: "Presentation generated successfully!",
+      });
+
       // Reset form
       setFormData({
-        prompt: '',
+        prompt: "",
         n_slides: 5,
-        language: 'English',
-        theme: 'light',
-        export_as: 'pptx'
+        language: "English",
+        theme: "light",
+        export_as: "pptx",
       });
 
       // Refresh the list
       await fetchPresentations();
     } catch (error) {
-      console.error('Error generating presentation:', error);
-      setMessage({ type: 'error', text: error.message || 'Failed to generate presentation' });
+      console.error("Error generating presentation:", error);
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to generate presentation",
+      });
     } finally {
       setGenerating(false);
     }
@@ -126,46 +144,62 @@ const PresentationManager = () => {
 
   const handleViewPresentation = async (presentationId: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/v1/ppt/presentation/${presentationId}`);
+      const response = await fetch(
+        `${API_BASE}/api/v1/ppt/presentation/${presentationId}`,
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch presentation details');
+        throw new Error("Failed to fetch presentation details");
       }
 
       const presentation = await response.json();
       setSelectedPresentation(presentation);
     } catch (error) {
-      console.error('Error fetching presentation:', error);
-      setMessage({ type: 'error', text: 'Failed to load presentation details' });
+      console.error("Error fetching presentation:", error);
+      setMessage({
+        type: "error",
+        text: "Failed to load presentation details",
+      });
     }
   };
 
   const handleDeletePresentation = async (presentationId: string) => {
-    if (!confirm('Are you sure you want to delete this presentation?')) {
+    if (!confirm("Are you sure you want to delete this presentation?")) {
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/v1/ppt/presentation/${presentationId}`, {
-        method: 'DELETE'
-      });
+      const response = await fetch(
+        `${API_BASE}/api/v1/ppt/presentation/${presentationId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || 'Failed to delete presentation');
+        throw new Error(error.detail || "Failed to delete presentation");
       }
 
-      setMessage({ type: 'success', text: 'Presentation deleted successfully' });
+      setMessage({
+        type: "success",
+        text: "Presentation deleted successfully",
+      });
       await fetchPresentations();
-      
+
       // Close details if viewing deleted presentation
-      if (selectedPresentation?.id === presentationId || 
-          selectedPresentation?.firebase_id === presentationId) {
+      if (
+        selectedPresentation?.id === presentationId ||
+        selectedPresentation?.firebase_id === presentationId
+      ) {
         setSelectedPresentation(null);
       }
     } catch (error) {
-      console.error('Error deleting presentation:', error);
-      setMessage({ type: 'error', text: error.message || 'Failed to delete presentation' });
+      console.error("Error deleting presentation:", error);
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to delete presentation",
+      });
     }
   };
 
@@ -173,7 +207,7 @@ const PresentationManager = () => {
     try {
       return new Date(dateString).toLocaleString();
     } catch {
-      return 'Invalid date';
+      return "Invalid date";
     }
   };
 
@@ -189,7 +223,9 @@ const PresentationManager = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {message && (
-            <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
+            <Alert
+              variant={message.type === "error" ? "destructive" : "default"}
+            >
               <AlertDescription>{message.text}</AlertDescription>
             </Alert>
           )}
@@ -200,7 +236,9 @@ const PresentationManager = () => {
               <Textarea
                 id="prompt"
                 value={formData.prompt}
-                onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, prompt: e.target.value })
+                }
                 placeholder="Enter the topic or detailed prompt for your presentation..."
                 disabled={generating}
                 rows={3}
@@ -215,16 +253,23 @@ const PresentationManager = () => {
                 min="1"
                 max="20"
                 value={formData.n_slides}
-                onChange={(e) => setFormData({ ...formData, n_slides: parseInt(e.target.value) || 5 })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    n_slides: parseInt(e.target.value) || 5,
+                  })
+                }
                 disabled={generating}
               />
             </div>
 
             <div>
               <Label htmlFor="language">Language</Label>
-              <Select 
-                value={formData.language} 
-                onValueChange={(value) => setFormData({ ...formData, language: value })}
+              <Select
+                value={formData.language}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, language: value })
+                }
                 disabled={generating}
               >
                 <SelectTrigger>
@@ -242,9 +287,11 @@ const PresentationManager = () => {
 
             <div>
               <Label htmlFor="theme">Theme</Label>
-              <Select 
-                value={formData.theme} 
-                onValueChange={(value) => setFormData({ ...formData, theme: value })}
+              <Select
+                value={formData.theme}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, theme: value })
+                }
                 disabled={generating}
               >
                 <SelectTrigger>
@@ -261,9 +308,11 @@ const PresentationManager = () => {
 
             <div>
               <Label htmlFor="export_as">Export Format</Label>
-              <Select 
-                value={formData.export_as} 
-                onValueChange={(value) => setFormData({ ...formData, export_as: value })}
+              <Select
+                value={formData.export_as}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, export_as: value })
+                }
                 disabled={generating}
               >
                 <SelectTrigger>
@@ -277,8 +326,8 @@ const PresentationManager = () => {
             </div>
           </div>
 
-          <Button 
-            onClick={handleGeneratePresentation} 
+          <Button
+            onClick={handleGeneratePresentation}
             disabled={generating || !formData.prompt.trim()}
             className="w-full"
           >
@@ -305,8 +354,8 @@ const PresentationManager = () => {
               <FileText className="w-5 h-5" />
               Generated Presentations
             </div>
-            <Button 
-              onClick={fetchPresentations} 
+            <Button
+              onClick={fetchPresentations}
               disabled={loading}
               variant="outline"
               size="sm"
@@ -326,19 +375,21 @@ const PresentationManager = () => {
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No presentations found</p>
-              <p className="text-sm">Generate your first presentation to get started</p>
+              <p className="text-sm">
+                Generate your first presentation to get started
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {presentations.map((presentation) => (
-                <div 
-                  key={presentation.firebase_id || presentation.id} 
+                <div
+                  key={presentation.firebase_id || presentation.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-1">
                     <div className="font-medium truncate pr-4">
                       {presentation.prompt.substring(0, 80)}
-                      {presentation.prompt.length > 80 && '...'}
+                      {presentation.prompt.length > 80 && "..."}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                       <div className="flex items-center gap-1">
@@ -361,9 +412,14 @@ const PresentationManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {presentation.api_response?.edit_path && (
+                    {presentation.api_response?.path && (
                       <Button
-                        onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentation.api_response.edit_path}`, '_blank')}
+                        onClick={() =>
+                          window.open(
+                            `http://tramway.proxy.rlwy.net:38813${presentation.api_response.path}`,
+                            "_blank",
+                          )
+                        }
                         variant="default"
                         size="sm"
                       >
@@ -372,7 +428,11 @@ const PresentationManager = () => {
                       </Button>
                     )}
                     <Button
-                      onClick={() => handleViewPresentation(presentation.firebase_id || presentation.id)}
+                      onClick={() =>
+                        handleViewPresentation(
+                          presentation.firebase_id || presentation.id,
+                        )
+                      }
                       variant="outline"
                       size="sm"
                     >
@@ -380,7 +440,11 @@ const PresentationManager = () => {
                       Details
                     </Button>
                     <Button
-                      onClick={() => handleDeletePresentation(presentation.firebase_id || presentation.id)}
+                      onClick={() =>
+                        handleDeletePresentation(
+                          presentation.firebase_id || presentation.id,
+                        )
+                      }
                       variant="destructive"
                       size="sm"
                     >
@@ -417,7 +481,7 @@ const PresentationManager = () => {
                 {selectedPresentation.prompt}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <Label>Slides</Label>
