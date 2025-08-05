@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save, Eye } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
@@ -62,6 +62,8 @@ const ComparisonTool = () => {
     presentation_id: string;
     path: string;
     edit_path: string;
+    static_url: string; // Added for the new static URL
+    firebase_id: string; // Assuming you might have a firebase ID for naming downloads
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -73,7 +75,7 @@ const ComparisonTool = () => {
       try {
         const comparison = JSON.parse(viewComparison);
         sessionStorage.removeItem('viewComparison');
-        
+
         // Set the schools and weights from the saved comparison
         const newSelectedSchools = comparison.schools.map((name: string, index: number) => ({
           id: `saved-${index}`,
@@ -90,17 +92,17 @@ const ComparisonTool = () => {
 
         setSelectedSchools(newSelectedSchools);
         setWeights(comparison.weights);
-        
+
         // Set the existing results without making new API calls
         setComparisonResult({
           schools_data: comparison.schoolsData,
           ai_report: comparison.aiReport
         });
-        
+
         if (comparison.presentationResult) {
           setPresentationResult(comparison.presentationResult);
         }
-        
+
         return; // Exit early since we're viewing a saved comparison
       } catch (error) {
         console.error('Failed to parse saved comparison:', error);
@@ -165,7 +167,7 @@ const ComparisonTool = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Streaming response error:', errorText);
-        
+
         // Handle the case where backend returns a simple message
         if (response.status === 200) {
           const data = JSON.parse(errorText);
@@ -180,7 +182,7 @@ const ComparisonTool = () => {
 
       // Check if response is streaming or JSON
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType && contentType.includes('application/json')) {
         // Handle non-streaming JSON response
         const data = await response.json();
@@ -346,6 +348,7 @@ const ComparisonTool = () => {
       }
 
       const result = await response.json();
+      // Assuming the API now returns `static_url` and `firebase_id` in the result
       setPresentationResult(result);
 
     } catch (error) {
@@ -368,7 +371,7 @@ const ComparisonTool = () => {
         weights: weights,
         aiReport: comparisonResult.ai_report,
         schoolsData: comparisonResult.schools_data,
-        presentationResult: presentationResult,
+        presentationResult: presentationResult, // This will save the presentationResult including static_url
         createdAt: serverTimestamp(),
       };
 
@@ -600,7 +603,7 @@ const ComparisonTool = () => {
                       <CardTitle>AI Analysis Report</CardTitle>
                       <div className="flex gap-2">
                         {comparisonResult && comparisonResult.ai_report && (
-                          
+
                           <div className="flex gap-2">
                             {!presentationResult && (
                               <Button
@@ -645,14 +648,31 @@ const ComparisonTool = () => {
                         )}
 
                         {presentationResult && (
-                          <Button
-                            onClick={() => window.open(`http://tramway.proxy.rlwy.net:38813${presentationResult.edit_path}`, '_blank')}
-                            variant="default"
-                            size="sm"
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View Presentation
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => window.open(`https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`, '_blank')}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View PDF
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`;
+                                link.download = `comparison-presentation-${presentationResult.firebase_id}.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              variant="default"
+                              size="sm"
+                            >
+                              <FileText className="w-4 h-4 mr-2" />
+                              Download PDF
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>

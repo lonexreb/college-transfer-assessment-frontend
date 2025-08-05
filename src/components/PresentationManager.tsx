@@ -412,20 +412,32 @@ const PresentationManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {presentation.api_response?.path && (
-                      <Button
-                        onClick={() =>
-                          window.open(
-                            `http://tramway.proxy.rlwy.net:38813${presentation.api_response.path}`,
-                            "_blank",
-                          )
-                        }
-                        variant="default"
-                        size="sm"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
+                    {presentation.static_url && (
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={() => window.open(`${API_BASE}${presentation.static_url}`, '_blank')}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = `${API_BASE}${presentation.static_url}`;
+                            link.download = `presentation-${presentation.firebase_id || presentation.id}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          variant="default"
+                          size="sm"
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          Download
+                        </Button>
+                      </div>
                     )}
                     <Button
                       onClick={() =>
