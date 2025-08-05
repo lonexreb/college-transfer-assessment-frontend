@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save, Eye } from "lucide-react";
+import { ArrowLeft, Plus, X, Loader2, TrendingUp, Users, DollarSign, GraduationCap, FileText, Save, Eye, Share2 } from "lucide-react";
 import InstitutionSearch from "./InstitutionSearch";
 import { Institution } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
@@ -66,6 +66,7 @@ const ComparisonTool = () => {
     firebase_id: string; // Assuming you might have a firebase ID for naming downloads
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Load assessment config from wizard or saved comparison for viewing
   useEffect(() => {
@@ -661,13 +662,18 @@ const ComparisonTool = () => {
                               onClick={() => {
                                 const shareableUrl = `https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`;
                                 navigator.clipboard.writeText(shareableUrl);
-                                // You may want to add a toast notification here
+                                setIsCopied(true);
+                                
+                                // Reset copied state after 2 seconds
+                                setTimeout(() => {
+                                  setIsCopied(false);
+                                }, 2000);
                               }}
                               variant="default"
                               size="sm"
                             >
-                              <FileText className="w-4 h-4 mr-2" />
-                              Copy Shareable Link
+                              <Share2 className="w-4 h-4 mr-2" />
+                              {isCopied ? "Copied!" : "Copy Shareable Link"}
                             </Button>
                           </div>
                         )}

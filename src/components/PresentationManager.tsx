@@ -21,7 +21,7 @@ import {
   Eye,
   RefreshCw,
   Loader2,
-  Download,
+  Share2,
   Calendar,
   Layers,
 } from "lucide-react";
@@ -49,6 +49,7 @@ const PresentationManager = () => {
   } | null>(null);
   const [selectedPresentation, setSelectedPresentation] =
     useState<Presentation | null>(null);
+  const [copiedStates, setCopiedStates] = useState<{[key: string]: boolean}>({});
 
   // Form state for creating new presentation
   const [formData, setFormData] = useState({
@@ -424,15 +425,22 @@ const PresentationManager = () => {
                         </Button>
                         <Button
                           onClick={() => {
+                            const presentationId = presentation.firebase_id || presentation.id;
                             const shareableUrl = `${API_BASE}${presentation.static_url}`;
                             navigator.clipboard.writeText(shareableUrl);
+                            setCopiedStates(prev => ({ ...prev, [presentationId]: true }));
                             setMessage({ type: "success", text: "Shareable link copied to clipboard!" });
+                            
+                            // Reset copied state after 2 seconds
+                            setTimeout(() => {
+                              setCopiedStates(prev => ({ ...prev, [presentationId]: false }));
+                            }, 2000);
                           }}
                           variant="default"
                           size="sm"
                         >
-                          <Download className="w-4 h-4 mr-1" />
-                          Copy Shareable Link
+                          <Share2 className="w-4 h-4 mr-1" />
+                          {copiedStates[presentation.firebase_id || presentation.id] ? "Copied!" : "Copy Shareable Link"}
                         </Button>
                       </div>
                     )}
