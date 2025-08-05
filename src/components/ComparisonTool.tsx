@@ -367,12 +367,12 @@ const ComparisonTool = () => {
     try {
       const comparisonData = {
         userId: currentUser.uid,
-        userEmail: currentUser.email,
-        schools: selectedSchools.map(school => school?.name),
+        userEmail: currentUser.email || "",
+        schools: selectedSchools.map(school => school?.name).filter(Boolean), // Remove undefined values
         weights: weights,
         aiReport: comparisonResult.ai_report,
-        schoolsData: comparisonResult.schools_data,
-        presentationResult: presentationResult, // This will save the presentationResult including static_url
+        schoolsData: comparisonResult.schools_data || [],
+        presentationResult: presentationResult || null, // Use null instead of undefined
         createdAt: serverTimestamp(),
       };
 
