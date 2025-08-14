@@ -1,0 +1,92 @@
+
+from fastapi import APIRouter, HTTPException, Depends, Form
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from admin_routes import verify_firebase_token, get_admin_emails
+import os
+
+router = APIRouter(prefix="/api/prompt", tags=["prompt"])
+
+class PromptUpdateRequest(BaseModel):
+    content: str
+
+@router.get("/")
+async def get_current_prompt():
+    """Get the current API prompt content"""
+    try:
+        if os.path.exists('prompt.txt'):
+            with open('prompt.txt', 'r', encoding='utf-8') as file:
+                content = file.read()
+            return {"content": content}
+        else:
+            return {"content": ""}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading prompt file: {str(e)}")
+
+@router.post("/update")
+async def update_prompt(
+    request: PromptUpdateRequest = None,
+    content: str = Form(None),
+    current_user_email: str = Depends(verify_firebase_token)
+):
+    """Update the API prompt content (admin only)"""
+    # Check if user is admin
+    admin_emails = await get_admin_emails()
+    if current_user_email not in admin_emails:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get content from either JSON or form data
+    prompt_content = request.content if request else content
+    
+    if not prompt_content:
+        raise HTTPException(status_code=400, detail="Content is required")
+    
+    try:
+        with open('prompt.txt', 'w', encoding='utf-8') as file:
+            file.write(prompt_content)
+        
+        return {
+            "message": "Prompt updated successfully",
+            "updated_by": current_user_email,
+            "content_length": len(prompt_content)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating prompt file: {str(e)}")
+
+@router.get("/download")
+async def download_prompt(current_user_email: str = Depends(verify_firebase_token)):
+    """Download the current prompt file (admin only)"""
+    # Check if user is admin
+    admin_emails = await get_admin_emails()
+    if current_user_email not in admin_emails:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if not os.path.exists('prompt.txt'):
+        raise HTTPException(status_code=404, detail="Prompt file not found")
+    
+    return FileResponse(
+        path='prompt.txt',
+        filename='api_prompt.txt',
+        media_type='text/plain'
+    )
+
+@router.post("/reset")
+async def reset_prompt(current_user_email: str = Depends(verify_firebase_token)):
+    """Reset prompt to default content (admin only)"""
+    # Check if user is admin
+    admin_emails = await get_admin_emails()
+    if current_user_email not in admin_emails:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    default_prompt = """You are an expert college transfer assessment analyst. Provide detailed, objective analysis based on the data provided. Focus on transfer-specific features and student support services."""
+    
+    try:
+        with open('prompt.txt', 'w', encoding='utf-8') as file:
+            file.write(default_prompt)
+        
+        return {
+            "message": "Prompt reset to default",
+            "reset_by": current_user_email
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resetting prompt file: {str(e)}")
