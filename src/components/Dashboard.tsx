@@ -9,6 +9,7 @@ import { mockAssessments } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import AdminManager from "@/components/AdminManager";
 import PresentationManager from "@/components/PresentationManager";
+import PromptManager from "./PromptManager";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 
@@ -75,14 +76,14 @@ const Dashboard = () => {
         const comparisonsData: Comparison[] = [];
         const institutionSet = new Set<string>();
         let thisWeekComparisons = 0;
-        
+
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           console.log("Processing document:", doc.id, data);
-          
+
           const comparison = {
             id: doc.id,
             schools: data.schools || [],
@@ -94,7 +95,7 @@ const Dashboard = () => {
             userId: data.userId,
             userEmail: data.userEmail
           };
-          
+
           comparisonsData.push(comparison);
 
           // Count comparisons from this week
@@ -129,7 +130,7 @@ const Dashboard = () => {
           const comparisonsData: Comparison[] = [];
           const institutionSet = new Set<string>();
           let thisWeekComparisons = 0;
-          
+
           const oneWeekAgo = new Date();
           oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -146,7 +147,7 @@ const Dashboard = () => {
               userId: data.userId,
               userEmail: data.userEmail
             };
-            
+
             comparisonsData.push(comparison);
 
             // Count comparisons from this week
@@ -245,9 +246,10 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="presentations">Presentations</TabsTrigger>
+            <TabsTrigger value="prompt">Prompt</TabsTrigger>
             <TabsTrigger value="admin">Admin Management</TabsTrigger>
           </TabsList>
 
@@ -388,6 +390,10 @@ const Dashboard = () => {
 
           <TabsContent value="presentations">
             <PresentationManager />
+          </TabsContent>
+
+          <TabsContent value="prompt">
+            <PromptManager />
           </TabsContent>
 
           <TabsContent value="admin">
