@@ -1,0 +1,179 @@
+# College Transfer Assessment API - Prompt Management Documentation
+
+## Prompt Management Endpoints
+
+The API now includes comprehensive prompt management functionality for three types of prompts used throughout the system:
+
+### Prompt Types
+- **assessment**: Used for college transfer assessment analysis
+- **presentation**: Used for AI-powered presentation generation
+- **firecrawl**: Used for web content analysis and extraction
+
+## Endpoints
+
+### GET `/api/prompt/`
+Get the current prompt content for a specific type.
+
+**Parameters:**
+- `prompt_type` (query, optional): Type of prompt to retrieve (default: "assessment")
+
+**Response:**
+```json
+{
+  "content": "Prompt content here...",
+  "type": "assessment",
+  "updated_by": "admin@example.com",
+  "updated_at": "2024-01-15T10:30:00Z",
+  "source": "firebase"
+}
+```
+
+### GET `/api/prompt/all`
+Get all prompts (assessment, presentation, firecrawl) at once.
+
+**Response:**
+```json
+{
+  "prompts": {
+    "assessment": {
+      "content": "Assessment prompt content...",
+      "type": "assessment",
+      "source": "firebase"
+    },
+    "presentation": {
+      "content": "Presentation prompt content...",
+      "type": "presentation", 
+      "source": "firebase"
+    },
+    "firecrawl": {
+      "content": "Firecrawl prompt content...",
+      "type": "firecrawl",
+      "source": "firebase"
+    }
+  }
+}
+```
+
+### POST `/api/prompt/update`
+Update a specific prompt (admin only).
+
+**Headers:**
+- `Authorization: Bearer <firebase_id_token>`
+
+**Body (JSON):**
+```json
+{
+  "content": "New prompt content here...",
+  "prompt_type": "assessment"
+}
+```
+
+**Or Form Data:**
+- `content`: New prompt content
+- `prompt_type`: Type of prompt (assessment/presentation/firecrawl)
+
+**Response:**
+```json
+{
+  "message": "Assessment prompt updated successfully",
+  "prompt_type": "assessment",
+  "updated_by": "admin@example.com",
+  "content_length": 1250
+}
+```
+
+### POST `/api/prompt/update-all`
+Update all prompts at once (admin only).
+
+**Headers:**
+- `Authorization: Bearer <firebase_id_token>`
+
+**Body (JSON):**
+```json
+{
+  "assessment_prompt": "New assessment prompt...",
+  "presentation_prompt": "New presentation prompt...",
+  "firecrawl_prompt": "New firecrawl prompt..."
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Prompts updated successfully",
+  "updated_prompts": ["assessment", "presentation", "firecrawl"],
+  "updated_by": "admin@example.com"
+}
+```
+
+### GET `/api/prompt/history`
+Get prompt update history (admin only).
+
+**Headers:**
+- `Authorization: Bearer <firebase_id_token>`
+
+**Parameters:**
+- `prompt_type` (query, optional): Type of prompt history to retrieve (default: "assessment")
+
+**Response:**
+```json
+{
+  "history": [
+    {
+      "content": "Previous prompt content...",
+      "updated_by": "admin@example.com",
+      "updated_at": "2024-01-15T10:30:00Z",
+      "type": "assessment"
+    }
+  ],
+  "prompt_type": "assessment"
+}
+```
+
+### GET `/api/prompt/download`
+Download the current prompt as a text file (admin only).
+
+**Headers:**
+- `Authorization: Bearer <firebase_id_token>`
+
+**Parameters:**
+- `prompt_type` (query, optional): Type of prompt to download (default: "assessment")
+
+**Response:** Text file download
+
+### POST `/api/prompt/reset`
+Reset prompt to default content (admin only).
+
+**Headers:**
+- `Authorization: Bearer <firebase_id_token>`
+
+**Body (Form Data):**
+- `prompt_type`: Type of prompt to reset (assessment/presentation/firecrawl)
+
+**Response:**
+```json
+{
+  "message": "Assessment prompt reset to default",
+  "prompt_type": "assessment",
+  "reset_by": "admin@example.com"
+}
+```
+
+## Integration with Existing Systems
+
+### College Assessment (`/api/compare`)
+Now uses the `assessment` prompt from Firebase for generating transfer friendliness reports.
+
+### Presentation Generation (`/api/v1/ppt/generate/presentation`) 
+Now processes user prompts through AI using the `presentation` prompt before sending to the tramway API. Creates structured 18-slide presentations based on uploaded assets.
+
+### Web Crawling (College Routes)
+Uses the `firecrawl` prompt for analyzing college websites and extracting transfer-related information.
+
+## Storage
+- All prompts are stored in Firebase Firestore under the `prompts` collection
+- Assessment prompts are also saved to `prompt.txt` for backward compatibility
+- Prompt history and metadata are tracked for auditing
+
+## Authentication
+All prompt modification endpoints require admin authentication via Firebase ID token.
