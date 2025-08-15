@@ -1,0 +1,33 @@
+chunk-T2SWDQEL.js?v=c9b5bafa:14032 The above error occurred in the <PresentationManager> component:
+
+    at PresentationManager (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/src/components/PresentationManager.tsx:24:29)
+    at div
+    at https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/chunk-SVK6EYV7.js?v=c9b5bafa:41:13
+    at Presence (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/chunk-LJ3RETOA.js?v=c9b5bafa:24:11)
+    at https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=c9b5bafa:448:13
+    at _c4 (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/src/components/ui/tabs.tsx:50:61)
+    at div
+    at https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/chunk-SVK6EYV7.js?v=c9b5bafa:41:13
+    at Provider (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/chunk-R2T6YHTW.js?v=c9b5bafa:43:15)
+    at https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/@radix-ui_react-tabs.js?v=c9b5bafa:326:7
+    at main
+    at div
+    at Dashboard (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/src/components/Dashboard.tsx:26:37)
+    at RenderedRoute (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/react-router-dom.js?v=c9b5bafa:4069:5)
+    at Routes (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/react-router-dom.js?v=c9b5bafa:4508:5)
+    at ProtectedRoute (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/src/components/ProtectedRoute.tsx:17:27)
+    at Router (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/react-router-dom.js?v=c9b5bafa:4451:15)
+    at BrowserRouter (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/react-router-dom.js?v=c9b5bafa:5196:5)
+    at Provider (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/chunk-R2T6YHTW.js?v=c9b5bafa:43:15)
+    at TooltipProvider (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=c9b5bafa:61:5)
+    at AuthProvider (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/src/contexts/AuthContext.tsx:20:32)
+    at QueryClientProvider (https://e3e68a8e-172a-4f8e-b624-ff009dd8abac-00-97va6pgp0a2k.riker.replit.dev:8080/node_modules/.vite/deps/@tanstack_react-query.js?v=c9b5bafa:2794:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+chunk-T2SWDQEL.js?v=c9b5bafa:19413 Uncaught TypeError: Cannot read properties of undefined (reading 'substring')
+    at PresentationManager.tsx:392:44
+    at Array.map (<anonymous>)
+    at PresentationManager (PresentationManager.tsx:385:30)
