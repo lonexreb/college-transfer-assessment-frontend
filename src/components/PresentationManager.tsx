@@ -36,6 +36,7 @@ interface Presentation {
   export_as: string;
   created_at: string;
   api_response?: any;
+  static_url?: string;
 }
 
 const PresentationManager = () => {
@@ -389,8 +390,8 @@ const PresentationManager = () => {
                 >
                   <div className="flex-1">
                     <div className="font-medium truncate pr-4">
-                      {presentation.prompt.substring(0, 80)}
-                      {presentation.prompt.length > 80 && "..."}
+                      {presentation.prompt ? presentation.prompt.substring(0, 80) : "No prompt available"}
+                      {presentation.prompt && presentation.prompt.length > 80 && "..."}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                       <div className="flex items-center gap-1">
@@ -430,7 +431,7 @@ const PresentationManager = () => {
                             navigator.clipboard.writeText(shareableUrl);
                             setCopiedStates(prev => ({ ...prev, [presentationId]: true }));
                             setMessage({ type: "success", text: "Shareable link copied to clipboard!" });
-                            
+
                             // Reset copied state after 2 seconds
                             setTimeout(() => {
                               setCopiedStates(prev => ({ ...prev, [presentationId]: false }));
