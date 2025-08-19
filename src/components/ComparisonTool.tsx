@@ -58,6 +58,7 @@ const ComparisonTool = () => {
   const [comparisonResult, setComparisonResult] = useState<ComparisonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
+  const [presentationProgress, setPresentationProgress] = useState(0);
   const [presentationResult, setPresentationResult] = useState<{
     presentation_id: string;
     path: string;
@@ -328,8 +329,20 @@ const ComparisonTool = () => {
     }
 
     setIsGeneratingPresentation(true);
+    setPresentationProgress(0);
     setError(null);
     setPresentationResult(null);
+
+    // Clear any previous messages immediately
+    setTimeout(() => setError(null), 100);
+
+    // Simulate progress updates during generation
+    const progressInterval = setInterval(() => {
+      setPresentationProgress(prev => {
+        if (prev >= 90) return prev; // Don't reach 100% until actually complete
+        return Math.min(prev + Math.random() * 8 + 2, 90); // More realistic increments
+      });
+    }, 1000);
 
     try {
       const formData = new FormData();
@@ -349,6 +362,10 @@ const ComparisonTool = () => {
       }
 
       const result = await response.json();
+      
+      // Complete the progress bar
+      setPresentationProgress(100);
+      
       // Assuming the API now returns `static_url` and `firebase_id` in the result
       setPresentationResult(result);
 
@@ -356,7 +373,12 @@ const ComparisonTool = () => {
       console.error('Presentation generation error:', error);
       setError('Failed to generate presentation. Please try again.');
     } finally {
-      setIsGeneratingPresentation(false);
+      clearInterval(progressInterval);
+      // Small delay to show 100% before clearing
+      setTimeout(() => {
+        setIsGeneratingPresentation(false);
+        setPresentationProgress(0);
+      }, 500);
     }
   };
 
@@ -606,24 +628,15 @@ const ComparisonTool = () => {
                         {comparisonResult && comparisonResult.ai_report && (
 
                           <div className="flex gap-2">
-                            {!presentationResult && (
+                            {!presentationResult && !isGeneratingPresentation && (
                               <Button
                                 onClick={handleGeneratePresentation}
                                 disabled={isGeneratingPresentation}
                                 variant="outline"
                                 size="sm"
                               >
-                                {isGeneratingPresentation ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Generating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <FileText className="w-4 h-4 mr-2" />
-                                    Generate Presentation
-                                  </>
-                                )}
+                                <FileText className="w-4 h-4 mr-2" />
+                                Generate Presentation
                               </Button>
                             )}
 
@@ -681,6 +694,33 @@ const ComparisonTool = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    {isGeneratingPresentation && (
+                      <div className="mb-6 space-y-4 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/30">
+                        <div className="text-center space-y-2">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                            <span className="font-medium text-blue-600">Generating Presentation...</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            ⏱️ This process typically takes 2-5 minutes depending on the complexity and number of slides
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>{Math.round(presentationProgress)}%</span>
+                          </div>
+                          <Progress value={presentationProgress} className="w-full h-3" />
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground text-center space-y-1">
+                          <p>🤖 AI is analyzing your comparison and creating presentation content</p>
+                          <p>📊 Please keep this tab open and wait for completion</p>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="prose max-w-none text-foreground">
                       <ReactMarkdown
                         components={{
