@@ -59,6 +59,7 @@ const ComparisonTool = () => {
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [presentationProgress, setPresentationProgress] = useState(0);
+  const [presentationStepMessage, setPresentationStepMessage] = useState('');
   const [presentationResult, setPresentationResult] = useState<{
     presentation_id: string;
     path: string;
@@ -330,26 +331,16 @@ const ComparisonTool = () => {
 
     setIsGeneratingPresentation(true);
     setPresentationProgress(0);
+    setPresentationStepMessage('Starting presentation generation...');
     setError(null);
     setPresentationResult(null);
-
-    // Clear any previous messages immediately
-    setTimeout(() => setError(null), 100);
-
-    // Simulate progress updates during generation
-    const progressInterval = setInterval(() => {
-      setPresentationProgress(prev => {
-        if (prev >= 90) return prev; // Don't reach 100% until actually complete
-        return Math.min(prev + Math.random() * 8 + 2, 90); // More realistic increments
-      });
-    }, 1000);
 
     try {
       const formData = new FormData();
       formData.append('prompt', `School Comparison Analysis: ${comparisonResult.ai_report}`);
       formData.append('n_slides', '8');
       formData.append('language', 'English');
-      formData.append('theme', 'light');
+      formData.append('template', 'general');
       formData.append('export_as', 'pptx');
 
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/v1/ppt/generate/presentation', {
@@ -361,23 +352,76 @@ const ComparisonTool = () => {
         throw new Error(`Failed to generate presentation: ${response.status}`);
       }
 
-      const result = await response.json();
+      // Check if response is streaming
+      const contentType = response.headers.get('content-type');
       
-      // Complete the progress bar
-      setPresentationProgress(100);
-      
-      // Assuming the API now returns `static_url` and `firebase_id` in the result
-      setPresentationResult(result);
+      if (contentType && contentType.includes('text/event-stream')) {
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
+
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.progress) {
+                  setPresentationProgress(data.progress);
+                }
+
+                if (data.message) {
+                  setPresentationStepMessage(data.message);
+                }
+
+                if (data.result && data.complete) {
+                  setPresentationResult(data.result);
+                  setIsGeneratingPresentation(false);
+                  setPresentationProgress(0);
+                  setPresentationStepMessage('');
+                  return;
+                }
+
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+
+              } catch (parseError) {
+                console.error('Failed to parse SSE data:', parseError);
+              }
+            }
+          }
+        }
+      } else {
+        // Handle regular JSON response (fallback)
+        const result = await response.json();
+        setPresentationProgress(100);
+        setPresentationResult(result);
+      }
 
     } catch (error) {
       console.error('Presentation generation error:', error);
       setError('Failed to generate presentation. Please try again.');
     } finally {
-      clearInterval(progressInterval);
       // Small delay to show 100% before clearing
       setTimeout(() => {
         setIsGeneratingPresentation(false);
         setPresentationProgress(0);
+        setPresentationStepMessage('');
       }, 500);
     }
   };
@@ -712,6 +756,11 @@ const ComparisonTool = () => {
                             <span>{Math.round(presentationProgress)}%</span>
                           </div>
                           <Progress value={presentationProgress} className="w-full h-3" />
+                          {presentationStepMessage && (
+                            <p className="text-sm text-blue-600 text-center font-medium">
+                              {presentationStepMessage}
+                            </p>
+                          )}
                         </div>
                         
                         <div className="text-xs text-muted-foreground text-center space-y-1">
