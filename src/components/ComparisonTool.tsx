@@ -343,44 +343,58 @@ const ComparisonTool = () => {
       formData.append('template', 'general');
       formData.append('export_as', 'pptx');
 
+      console.log('Starting presentation generation request...');
+
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/v1/ppt/generate/presentation', {
         method: 'POST',
         body: formData,
+        headers: {
+          'Accept': 'text/event-stream, application/json',
+        },
       });
 
       if (!response.ok) {
         throw new Error(`Failed to generate presentation: ${response.status}`);
       }
 
-      // Check if response is streaming
+      console.log('Response received, checking content type...');
       const contentType = response.headers.get('content-type');
+      console.log('Content-Type:', contentType);
       
-      if (contentType && contentType.includes('text/event-stream')) {
-        // Handle streaming response
-        const reader = response.body?.getReader();
+      // Always try to handle as streaming first since your backend uses StreamingResponse
+      if (response.body) {
+        console.log('Processing streaming response...');
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
-
-        if (!reader) {
-          throw new Error('No response body reader available');
-        }
 
         let buffer = '';
 
         while (true) {
           const { done, value } = await reader.read();
 
-          if (done) break;
+          if (done) {
+            console.log('Stream completed');
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
           for (const line of lines) {
+            if (line.trim() === '') continue;
+            
+            console.log('Received line:', line);
+            
             if (line.startsWith('data: ')) {
               try {
-                const data = JSON.parse(line.slice(6));
+                const jsonStr = line.slice(6).trim();
+                if (jsonStr === '') continue;
+                
+                const data = JSON.parse(jsonStr);
+                console.log('Parsed data:', data);
 
-                if (data.progress) {
+                if (data.progress !== undefined) {
                   setPresentationProgress(data.progress);
                 }
 
@@ -388,11 +402,24 @@ const ComparisonTool = () => {
                   setPresentationStepMessage(data.message);
                 }
 
-                if (data.result && data.complete) {
-                  setPresentationResult(data.result);
-                  setIsGeneratingPresentation(false);
-                  setPresentationProgress(0);
-                  setPresentationStepMessage('');
+                if (data.step) {
+                  setPresentationStepMessage(`Step ${data.step}: ${data.message || 'Processing...'}`);
+                }
+
+                // Check for completion indicators
+                if (data.complete || data.result || data.presentation_id) {
+                  console.log('Presentation generation complete:', data);
+                  
+                  // Handle different response formats
+                  const result = data.result || data;
+                  setPresentationResult(result);
+                  setPresentationProgress(100);
+                  
+                  setTimeout(() => {
+                    setIsGeneratingPresentation(false);
+                    setPresentationProgress(0);
+                    setPresentationStepMessage('');
+                  }, 1000);
                   return;
                 }
 
@@ -401,21 +428,27 @@ const ComparisonTool = () => {
                 }
 
               } catch (parseError) {
-                console.error('Failed to parse SSE data:', parseError);
+                console.error('Failed to parse SSE data:', parseError, 'Line:', line);
               }
             }
           }
         }
+        
+        // If we reach here without getting a result, something went wrong
+        throw new Error('Stream ended without receiving presentation result');
+        
       } else {
-        // Handle regular JSON response (fallback)
+        // Fallback to regular JSON response
+        console.log('Handling as regular JSON response...');
         const result = await response.json();
+        console.log('JSON result:', result);
         setPresentationProgress(100);
         setPresentationResult(result);
       }
 
     } catch (error) {
       console.error('Presentation generation error:', error);
-      setError('Failed to generate presentation. Please try again.');
+      setError(`Failed to generate presentation: ${error.message}`);
     } finally {
       // Small delay to show 100% before clearing
       setTimeout(() => {
