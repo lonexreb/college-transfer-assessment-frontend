@@ -97,14 +97,17 @@ const PresentationManager = () => {
     setGenerating(true);
     setProgress(0);
     setMessage(null);
+    
+    // Clear any previous messages immediately
+    setTimeout(() => setMessage(null), 100);
 
     // Simulate progress updates during generation
     const progressInterval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 95) return prev; // Don't reach 100% until actually complete
-        return prev + Math.random() * 10; // Random increments
+        if (prev >= 90) return prev; // Don't reach 100% until actually complete
+        return Math.min(prev + Math.random() * 8 + 2, 90); // More realistic increments
       });
-    }, 800);
+    }, 1000);
 
     try {
       const formDataToSend = new FormData();
@@ -156,8 +159,11 @@ const PresentationManager = () => {
       });
     } finally {
       clearInterval(progressInterval);
-      setGenerating(false);
-      setProgress(0);
+      // Small delay to show 100% before clearing
+      setTimeout(() => {
+        setGenerating(false);
+        setProgress(0);
+      }, 500);
     }
   };
 
@@ -380,7 +386,7 @@ const PresentationManager = () => {
             {generating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating Presentation...
+                Generating... {Math.round(progress)}%
               </>
             ) : (
               <>
