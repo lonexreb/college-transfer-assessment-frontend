@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ const PresentationManager = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -93,7 +95,16 @@ const PresentationManager = () => {
     }
 
     setGenerating(true);
+    setProgress(0);
     setMessage(null);
+
+    // Simulate progress updates during generation
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 95) return prev; // Don't reach 100% until actually complete
+        return prev + Math.random() * 10; // Random increments
+      });
+    }, 800);
 
     try {
       const formDataToSend = new FormData();
@@ -117,6 +128,10 @@ const PresentationManager = () => {
       }
 
       const result = await response.json();
+      
+      // Complete the progress bar
+      setProgress(100);
+      
       setMessage({
         type: "success",
         text: "Presentation generated successfully!",
@@ -140,7 +155,9 @@ const PresentationManager = () => {
         text: error.message || "Failed to generate presentation",
       });
     } finally {
+      clearInterval(progressInterval);
       setGenerating(false);
+      setProgress(0);
     }
   };
 
@@ -327,6 +344,33 @@ const PresentationManager = () => {
               </Select>
             </div>
           </div>
+
+          {generating && (
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/30">
+              <div className="text-center space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  <span className="font-medium text-blue-600">Generating Presentation...</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  ⏱️ This process typically takes 2-5 minutes depending on the complexity and number of slides
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <Progress value={progress} className="w-full h-3" />
+              </div>
+              
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <p>🤖 AI is analyzing your prompt and creating slide content</p>
+                <p>📊 Please keep this tab open and wait for completion</p>
+              </div>
+            </div>
+          )}
 
           <Button
             onClick={handleGeneratePresentation}
