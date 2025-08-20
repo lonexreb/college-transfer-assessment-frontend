@@ -359,7 +359,7 @@ const PresentationManager = () => {
                   <span className="font-medium text-blue-600">Generating Presentation...</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  ⏱️ This process typically takes 2-5 minutes depending on the complexity and number of slides
+                  ⏱️ This process typically takes 5-10 minutes please be patient
                 </p>
               </div>
               

@@ -449,7 +449,7 @@ const ComparisonTool = () => {
             try {
               const data = JSON.parse(jsonStr);
               console.log('📦 PARSED SSE DATA:', data);
-
+              console.log('📊 CURRENT PROGRESS:', data);
               // Handle progress updates
               if (data.progress !== undefined && typeof data.progress === 'number') {
                 console.log('📊 Setting progress to:', data.progress);
