@@ -60,6 +60,7 @@ const ComparisonTool = () => {
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [presentationProgress, setPresentationProgress] = useState(0);
   const [presentationStepMessage, setPresentationStepMessage] = useState('');
+  const [progressSimulation, setProgressSimulation] = useState<NodeJS.Timeout | null>(null);
   const [presentationResult, setPresentationResult] = useState<{
     presentation_id: string;
     path: string;
@@ -335,6 +336,16 @@ const ComparisonTool = () => {
     setError(null);
     setPresentationResult(null);
 
+    // Start a fallback progress simulation
+    let simulatedProgress = 0;
+    const progressInterval = setInterval(() => {
+      simulatedProgress += Math.random() * 10;
+      if (simulatedProgress < 90) {
+        setPresentationProgress(simulatedProgress);
+      }
+    }, 2000);
+    setProgressSimulation(progressInterval);
+
     try {
       const formData = new FormData();
       formData.append('prompt', `School Comparison Analysis: ${comparisonResult.ai_report}`);
@@ -384,43 +395,84 @@ const ComparisonTool = () => {
           for (const line of lines) {
             if (line.trim() === '') continue;
             
-            console.log('Received line:', line);
+            console.log('Received raw line:', line);
             
-            if (line.startsWith('data: ')) {
+            // Handle different SSE formats
+            if (line.startsWith('data: ') || line.startsWith('event:') || line.includes('{')) {
+              let jsonStr = '';
+              
+              if (line.startsWith('data: ')) {
+                jsonStr = line.slice(6).trim();
+              } else if (line.startsWith('{')) {
+                // Handle lines that are pure JSON without "data: " prefix
+                jsonStr = line.trim();
+              }
+              
+              if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
               try {
-                const jsonStr = line.slice(6).trim();
-                if (jsonStr === '') continue;
-                
                 const data = JSON.parse(jsonStr);
-                console.log('Parsed data:', data);
+                console.log('Parsed SSE data:', data);
 
-                if (data.progress !== undefined) {
-                  setPresentationProgress(data.progress);
+                // Handle different progress update formats
+                if (data.progress !== undefined && typeof data.progress === 'number') {
+                  console.log('Setting progress to:', data.progress);
+                  setPresentationProgress(Math.min(100, Math.max(0, data.progress)));
                 }
 
-                if (data.message) {
+                // Handle percentage-based progress
+                if (data.percentage !== undefined && typeof data.percentage === 'number') {
+                  console.log('Setting percentage to:', data.percentage);
+                  setPresentationProgress(Math.min(100, Math.max(0, data.percentage)));
+                }
+
+                // Handle step-based progress
+                if (data.step !== undefined && data.total_steps !== undefined) {
+                  const stepProgress = (data.step / data.total_steps) * 100;
+                  console.log('Calculating step progress:', stepProgress, `(${data.step}/${data.total_steps})`);
+                  setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
+                }
+
+                // Handle status messages
+                if (data.status && typeof data.status === 'string') {
+                  console.log('Setting status message:', data.status);
+                  setPresentationStepMessage(data.status);
+                }
+
+                if (data.message && typeof data.message === 'string') {
+                  console.log('Setting message:', data.message);
                   setPresentationStepMessage(data.message);
                 }
 
-                if (data.step) {
-                  setPresentationStepMessage(`Step ${data.step}: ${data.message || 'Processing...'}`);
+                // Handle step with message
+                if (data.step && (data.message || data.status)) {
+                  const message = data.message || data.status || 'Processing...';
+                  const stepMessage = `Step ${data.step}: ${message}`;
+                  console.log('Setting step message:', stepMessage);
+                  setPresentationStepMessage(stepMessage);
                 }
 
-                // Check for completion indicators
-                if (data.complete || data.result || data.presentation_id) {
+                // Handle completion indicators
+                if (data.complete || data.result || data.presentation_id || data.download_url) {
                   console.log('Presentation generation complete:', data);
                   
                   // Handle different response formats
                   const result = data.result || data;
                   setPresentationResult(result);
                   setPresentationProgress(100);
+                  setPresentationStepMessage('Presentation generation complete!');
                   
                   setTimeout(() => {
                     setIsGeneratingPresentation(false);
                     setPresentationProgress(0);
                     setPresentationStepMessage('');
-                  }, 1000);
+                  }, 2000);
                   return;
+                }
+
+                // Handle streaming content (text chunks)
+                if (data.content && typeof data.content === 'string') {
+                  console.log('Received content chunk:', data.content.substring(0, 50) + '...');
+                  setPresentationStepMessage('Generating presentation content...');
                 }
 
                 if (data.error) {
@@ -428,8 +480,11 @@ const ComparisonTool = () => {
                 }
 
               } catch (parseError) {
-                console.error('Failed to parse SSE data:', parseError, 'Line:', line);
+                console.error('Failed to parse SSE data:', parseError, 'Raw line:', line, 'JSON string:', jsonStr);
               }
+            } else {
+              // Handle non-JSON lines that might contain status info
+              console.log('Non-JSON line received:', line);
             }
           }
         }
@@ -450,6 +505,12 @@ const ComparisonTool = () => {
       console.error('Presentation generation error:', error);
       setError(`Failed to generate presentation: ${error.message}`);
     } finally {
+      // Clear progress simulation
+      if (progressSimulation) {
+        clearInterval(progressSimulation);
+        setProgressSimulation(null);
+      }
+      
       // Small delay to show 100% before clearing
       setTimeout(() => {
         setIsGeneratingPresentation(false);
