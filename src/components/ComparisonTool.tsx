@@ -482,6 +482,7 @@ const ComparisonTool = () => {
               } catch (parseError) {
                 console.error('Failed to parse SSE data:', parseError, 'Raw line:', line, 'JSON string:', jsonStr);
               }
+              }
             } else {
               // Handle non-JSON lines that might contain status info
               console.log('Non-JSON line received:', line);
