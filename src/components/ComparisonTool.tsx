@@ -465,22 +465,24 @@ const ComparisonTool = () => {
                   }
                 }
 
-                // Handle status messages
-                if (data.message && typeof data.message === 'string') {
-                  console.log('Setting message:', data.message);
-                  setPresentationStepMessage(data.message);
-                }
+                // Handle all message types - show every message that comes through
+                let messageToShow = '';
 
-                if (data.status && typeof data.status === 'string') {
-                  console.log('Setting status message:', data.status);
-                  setPresentationStepMessage(data.status);
-                }
-
-                // Handle step with message (your backend format)
+                // Priority order: step+message > message > status
                 if (data.step && data.message) {
-                  const stepMessage = `Step ${data.step}: ${data.message}`;
-                  console.log('Setting step message:', stepMessage);
-                  setPresentationStepMessage(stepMessage);
+                  messageToShow = `Step ${data.step}: ${data.message}`;
+                  console.log('Setting step message:', messageToShow);
+                } else if (data.message && typeof data.message === 'string') {
+                  messageToShow = data.message;
+                  console.log('Setting message:', messageToShow);
+                } else if (data.status && typeof data.status === 'string') {
+                  messageToShow = data.status;
+                  console.log('Setting status message:', messageToShow);
+                }
+
+                // Update the message display for any valid message
+                if (messageToShow) {
+                  setPresentationStepMessage(messageToShow);
                 }
 
                 // Handle completion indicators
