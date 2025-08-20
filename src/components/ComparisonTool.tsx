@@ -426,7 +426,9 @@ const ComparisonTool = () => {
           for (const line of lines) {
             if (line.trim() === '') continue;
 
-            console.log('Received raw line:', line);
+            console.log('🔴 RECEIVED RAW LINE:', JSON.stringify(line));
+            console.log('📏 LINE LENGTH:', line.length);
+            console.log('🔠 LINE CONTENT:', line);
 
             // Handle different streaming formats more robustly
             let jsonStr = '';
@@ -450,7 +452,10 @@ const ComparisonTool = () => {
             if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
               try {
                 data = JSON.parse(jsonStr);
-                console.log('Parsed streaming data:', data);
+                console.log('🔍 RAW JSON STRING:', jsonStr);
+                console.log('📦 PARSED DATA:', data);
+                console.log('🏷️ DATA TYPE:', typeof data);
+                console.log('🔑 DATA KEYS:', Object.keys(data));
 
                 // Handle different progress update formats from backend
                 if (data.progress !== undefined && typeof data.progress === 'number') {
@@ -500,21 +505,36 @@ const ComparisonTool = () => {
                 // Handle all message types - show every message that comes through
                 let messageToShow = '';
 
-                // Priority order: step+message > message > status
+                // Try to extract a message from various possible fields
                 if (data.step && data.message) {
                   messageToShow = `Step ${data.step}: ${data.message}`;
-                  console.log('Setting step message:', messageToShow);
+                  console.log('✅ Setting step message:', messageToShow);
                 } else if (data.message && typeof data.message === 'string') {
                   messageToShow = data.message;
-                  console.log('Setting message:', messageToShow);
+                  console.log('✅ Setting message:', messageToShow);
                 } else if (data.status && typeof data.status === 'string') {
                   messageToShow = data.status;
-                  console.log('Setting status message:', messageToShow);
+                  console.log('✅ Setting status message:', messageToShow);
+                } else if (data.text && typeof data.text === 'string') {
+                  messageToShow = data.text;
+                  console.log('✅ Setting text message:', messageToShow);
+                } else if (data.content && typeof data.content === 'string') {
+                  messageToShow = data.content;
+                  console.log('✅ Setting content message:', messageToShow);
+                } else if (typeof data === 'string') {
+                  messageToShow = data;
+                  console.log('✅ Setting string data as message:', messageToShow);
+                } else {
+                  // Log what we received if we can't find a message
+                  console.log('⚠️ No recognizable message field found in data:', data);
                 }
 
                 // Update the message display for any valid message
                 if (messageToShow) {
+                  console.log('🔄 UPDATING PRESENTATION MESSAGE TO:', messageToShow);
                   setPresentationStepMessage(messageToShow);
+                } else {
+                  console.log('❌ No message to show from this data chunk');
                 }
 
                 // Handle completion indicators
