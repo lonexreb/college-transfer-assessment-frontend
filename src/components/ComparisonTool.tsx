@@ -40,6 +40,13 @@ interface ComparisonWeights {
 interface ComparisonResponse {
   schools_data: SchoolData[];
   ai_report: string;
+  presentationResult?: {
+    presentation_id: string;
+    path: string;
+    edit_path: string;
+    static_url: string;
+    firebase_id: string;
+  } | null;
 }
 
 const ComparisonTool = () => {
@@ -371,7 +378,7 @@ const ComparisonTool = () => {
       console.log('Response received, checking content type...');
       const contentType = response.headers.get('content-type');
       console.log('Content-Type:', contentType);
-      
+
       // Always try to handle as streaming first since your backend uses StreamingResponse
       if (response.body) {
         console.log('Processing streaming response...');
@@ -394,20 +401,20 @@ const ComparisonTool = () => {
 
           for (const line of lines) {
             if (line.trim() === '') continue;
-            
+
             console.log('Received raw line:', line);
-            
+
             // Handle different SSE formats
             if (line.startsWith('data: ') || line.startsWith('event:') || line.includes('{')) {
               let jsonStr = '';
-              
+
               if (line.startsWith('data: ')) {
                 jsonStr = line.slice(6).trim();
               } else if (line.startsWith('{')) {
                 // Handle lines that are pure JSON without "data: " prefix
                 jsonStr = line.trim();
               }
-              
+
               if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
               try {
                 const data = JSON.parse(jsonStr);
@@ -454,13 +461,13 @@ const ComparisonTool = () => {
                 // Handle completion indicators
                 if (data.complete || data.result || data.presentation_id || data.download_url) {
                   console.log('Presentation generation complete:', data);
-                  
+
                   // Handle different response formats
                   const result = data.result || data;
                   setPresentationResult(result);
                   setPresentationProgress(100);
                   setPresentationStepMessage('Presentation generation complete!');
-                  
+
                   setTimeout(() => {
                     setIsGeneratingPresentation(false);
                     setPresentationProgress(0);
@@ -489,10 +496,10 @@ const ComparisonTool = () => {
             }
           }
         }
-        
+
         // If we reach here without getting a result, something went wrong
         throw new Error('Stream ended without receiving presentation result');
-        
+
       } else {
         // Fallback to regular JSON response
         console.log('Handling as regular JSON response...');
@@ -511,7 +518,7 @@ const ComparisonTool = () => {
         clearInterval(progressSimulation);
         setProgressSimulation(null);
       }
-      
+
       // Small delay to show 100% before clearing
       setTimeout(() => {
         setIsGeneratingPresentation(false);
@@ -815,7 +822,7 @@ const ComparisonTool = () => {
                                 const shareableUrl = `https://degree-works-backend-hydrabeans.replit.app${presentationResult.static_url}`;
                                 navigator.clipboard.writeText(shareableUrl);
                                 setIsCopied(true);
-                                
+
                                 // Reset copied state after 2 seconds
                                 setTimeout(() => {
                                   setIsCopied(false);
@@ -844,7 +851,7 @@ const ComparisonTool = () => {
                             ⏱️ This process typically takes 2-5 minutes depending on the complexity and number of slides
                           </p>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span>Progress</span>
@@ -857,14 +864,14 @@ const ComparisonTool = () => {
                             </p>
                           )}
                         </div>
-                        
+
                         <div className="text-xs text-muted-foreground text-center space-y-1">
                           <p>🤖 AI is analyzing your comparison and creating presentation content</p>
                           <p>📊 Please keep this tab open and wait for completion</p>
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="prose max-w-none text-foreground">
                       <ReactMarkdown
                         components={{
