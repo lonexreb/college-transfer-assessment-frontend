@@ -1,0 +1,379 @@
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
+import uuid
+import replicate
+import json
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for presentations")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api/v1/ppt", tags=["presentation"])
+
+@router.post("/generate/presentation")
+async def generate_presentation_stream(
+    prompt: str = Form(...),
+    n_slides: int = Form(5),
+    language: str = Form("English"),
+    template: str = Form("general"),
+    export_as: str = Form("pptx")
+):
+    print("Generating presentation with streaming progress")
+    if not prompt:
+        raise HTTPException(status_code=400, detail='Prompt is required')
+
+    async def generate():
+        try:
+            # Step 1: Initialize
+            yield f"data: {json.dumps({'step': 1, 'message': 'Starting presentation generation...', 'progress': 5})}\n\n"
+
+            # Step 2: Get presentation prompt from Firebase
+            yield f"data: {json.dumps({'step': 2, 'message': 'Loading presentation template...', 'progress': 10})}\n\n"
+            
+            presentation_prompt_base = ""
+            try:
+                doc_ref = db.collection('prompts').document('presentation')
+                doc = doc_ref.get()
+                if doc.exists:
+                    presentation_prompt_base = doc.to_dict().get('content', '')
+            except Exception as e:
+                print(f"Error getting presentation prompt from Firebase: {e}")
+                presentation_prompt_base = """You are an expert presentation designer. Based on the user's request and the attached assets, create a detailed 18-slide presentation structure that follows the organization shown in the uploaded PowerPoint and PDF materials."""
+
+            # Step 3: AI Processing
+            yield f"data: {json.dumps({'step': 3, 'message': 'Generating presentation prompt...', 'progress': 20})}\n\n"
+            
+            ai_processing_prompt = f"""
+{presentation_prompt_base}
+
+USER REQUEST: {prompt}
+
+Generate the final prompt that should be sent to the presentation API:
+"""
+
+            # Step 4: Stream AI processing
+            yield f"data: {json.dumps({'step': 4, 'message': 'Creating presentation structure...', 'progress': 30})}\n\n"
+            
+            processed_prompt = ""
+            ai_progress = 30
+            for event in replicate.stream(
+                "openai/gpt-4o",
+                input={
+                    "top_p": 1,
+                    "prompt": ai_processing_prompt,
+                    "temperature": 0.7,
+                    "system_prompt": "You are a presentation design expert who creates structured, professional presentation outlines for business and academic purposes.",
+                    "max_completion_tokens": 3000
+                },
+            ):
+                processed_prompt += str(event)
+                ai_progress = min(ai_progress + 0.5, 50)
+                yield f"data: {json.dumps({'step': 4, 'message': 'Creating presentation structure...', 'progress': int(ai_progress)})}\n\n"
+
+            # Step 5: Call external API
+            yield f"data: {json.dumps({'step': 5, 'message': 'Generating presentation...', 'progress': 60})}\n\n"
+            
+            response = requests.post("http://tramway.proxy.rlwy.net:38813/api/v1/ppt/presentation/generate",
+                data={
+                    "prompt": processed_prompt,
+                    "n_slides": str(18),
+                    "language": language,
+                    "template": "modern",
+                    "export_as": export_as
+                },
+                timeout=120
+            )
+            
+            yield f"data: {json.dumps({'step': 6, 'message': 'Finalizing presentation...', 'progress': 80})}\n\n"
+            
+            response.raise_for_status()
+            presentation_data = response.json()
+
+            # Step 6: Save to Firebase
+            yield f"data: {json.dumps({'step': 7, 'message': 'Saving presentation...', 'progress': 90})}\n\n"
+            
+            presentation_id = str(uuid.uuid4())
+            static_url = f"/api/v1/ppt/view/{presentation_id}"
+
+            firebase_data = {
+                "id": presentation_id,
+                "prompt": prompt,
+                "processed_prompt": processed_prompt,
+                "n_slides": 18,
+                "language": language,
+                "template": template,
+                "export_as": export_as,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "static_url": static_url,
+                "original_api_response": presentation_data
+            }
+
+            db.collection('presentations').document(presentation_id).set(firebase_data)
+            
+            # Step 7: Complete
+            result = {
+                "firebase_id": presentation_id,
+                "static_url": static_url,
+                "share_link": static_url,
+                "original_prompt": prompt,
+                "processed_prompt": processed_prompt[:200] + "..." if len(processed_prompt) > 200 else processed_prompt,
+                "n_slides": 18,
+                "language": language,
+                "template": template,
+                "export_as": export_as,
+                "message": "Presentation generated successfully"
+            }
+            
+            yield f"data: {json.dumps({'step': 8, 'message': 'Presentation ready!', 'progress': 100, 'result': result, 'complete': True})}\n\n"
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            yield f"data: {json.dumps({'error': error_msg, 'complete': True})}\n\n"
+
+    return StreamingResponse(generate(), media_type='text/plain', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    })
+
+@router.post("/generate/presentation-sync")
+async def generate_presentation_sync(
+    prompt: str = Form(...),
+    n_slides: int = Form(5),
+    language: str = Form("English"),
+    template: str = Form("general"),
+    export_as: str = Form("pptx")
+):
+    """Non-streaming version for backward compatibility"""
+    print("Generating presentation (synchronous)")
+    if not prompt:
+        raise HTTPException(status_code=400, detail='Prompt is required')
+
+    try:        
+        # Get presentation prompt from Firebase
+        presentation_prompt_base = ""
+        try:
+            doc_ref = db.collection('prompts').document('presentation')
+            doc = doc_ref.get()
+            if doc.exists:
+                presentation_prompt_base = doc.to_dict().get('content', '')
+        except Exception as e:
+            print(f"Error getting presentation prompt from Firebase: {e}")
+            presentation_prompt_base = """You are an expert presentation designer. Based on the user's request and the attached assets, create a detailed 18-slide presentation structure that follows the organization shown in the uploaded PowerPoint and PDF materials."""
+
+        # Process prompt through AI
+        ai_processing_prompt = f"""
+{presentation_prompt_base}
+
+USER REQUEST: {prompt}
+
+Generate the final prompt that should be sent to the presentation API:
+"""
+
+        processed_prompt = ""
+        for event in replicate.stream(
+            "openai/gpt-4o",
+            input={
+                "top_p": 1,
+                "prompt": ai_processing_prompt,
+                "temperature": 0.7,
+                "system_prompt": "You are a presentation design expert who creates structured, professional presentation outlines for business and academic purposes.",
+                "max_completion_tokens": 3000
+            },
+        ):
+            processed_prompt += str(event)
+
+        # Call external API
+        response = requests.post("http://tramway.proxy.rlwy.net:38813/api/v1/ppt/presentation/generate",
+            data={
+                "prompt": processed_prompt,
+                "n_slides": str(18),
+                "language": language,
+                "template": "modern",
+                "export_as": export_as
+            }
+        )
+        response.raise_for_status()
+        presentation_data = response.json()
+
+        # Generate unique presentation ID and save
+        presentation_id = str(uuid.uuid4())
+        static_url = f"/api/v1/ppt/view/{presentation_id}"
+
+        firebase_data = {
+            "id": presentation_id,
+            "prompt": prompt,
+            "processed_prompt": processed_prompt,
+            "n_slides": 18,
+            "language": language,
+            "template": template,
+            "export_as": export_as,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "static_url": static_url,
+            "original_api_response": presentation_data
+        }
+
+        db.collection('presentations').document(presentation_id).set(firebase_data)
+        print(f"Presentation saved to Firebase with ID: {presentation_id}")
+
+        return {
+            "firebase_id": presentation_id,
+            "static_url": static_url,
+            "share_link": static_url,
+            "original_prompt": prompt,
+            "processed_prompt": processed_prompt[:200] + "..." if len(processed_prompt) > 200 else processed_prompt,
+            "n_slides": 18,
+            "language": language,
+            "template": template,
+            "export_as": export_as,
+            "message": "Presentation generated successfully"
+        }
+
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f'Presentation API request failed: {str(e)}')
+
+@router.get("/list/presentations")
+async def list_presentations():
+    """List all presentation links from Firebase"""
+    print("Fetching presentation list from Firebase")
+
+    try:
+        presentations_ref = db.collection('presentations')
+        docs = presentations_ref.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+
+        presentations = []
+        for doc in docs:
+            presentation_data = doc.to_dict()
+            # Convert Firestore timestamp to ISO format
+            if 'created_at' in presentation_data and presentation_data['created_at']:
+                presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+
+            # Ensure static_url is present (for backwards compatibility)
+            if 'static_url' not in presentation_data:
+                presentation_data['static_url'] = f"/api/v1/ppt/view/{presentation_data.get('id', doc.id)}"
+
+            presentations.append(presentation_data)
+
+        return {"presentations": presentations}
+
+    except Exception as e:
+        print(f"Error fetching presentations from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentations: {str(e)}')
+
+@router.get("/presentation/{presentation_id}")
+async def get_presentation(presentation_id: str):
+    """Get a specific presentation by ID from Firebase"""
+    print(f"Fetching presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        presentation_data = doc.to_dict()
+        # Convert Firestore timestamp to ISO format
+        if 'created_at' in presentation_data and presentation_data['created_at']:
+            presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+
+        return presentation_data
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error fetching presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentation: {str(e)}')
+
+@router.get("/view/{presentation_id}")
+async def view_presentation(presentation_id: str):
+    print(f"Serving presentation {presentation_id}")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        presentation_data = doc.to_dict()
+        print(f"Presentation data: {presentation_data}")
+
+        # Get the file path from the API response
+        file_path = presentation_data["original_api_response"]["path"]
+        full_file_url = f"http://tramway.proxy.rlwy.net:38813{file_path}"
+        print(f"Fetching file from: {full_file_url}")
+
+        # Determine file type and media type
+        file_extension = file_path.lower().split('.')[-1]
+        if file_extension == 'pdf':
+            media_type = "application/pdf"
+            filename = f"presentation_{presentation_id}.pdf"
+            disposition = "inline"
+        elif file_extension == 'pptx':
+            media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            filename = f"presentation_{presentation_id}.pptx"
+            disposition = "attachment"
+        else:
+            # Default to PDF if unknown
+            media_type = "application/pdf"
+            filename = f"presentation_{presentation_id}.pdf"
+            disposition = "inline"
+
+        # Fetch the file content from the external server
+        file_response = requests.get(full_file_url, timeout=30)
+        file_response.raise_for_status()
+
+        # Return the file content directly with proper headers
+        return Response(
+            content=file_response.content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"{disposition}; filename={filename}",
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except requests.RequestException as e:
+        print(f"Error fetching PDF content: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch PDF content: {str(e)}')
+    except Exception as e:
+        print(f"Error serving presentation: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to serve presentation: {str(e)}')
+
+@router.delete("/presentation/{presentation_id}")
+async def delete_presentation(presentation_id: str):
+    """Delete a specific presentation by ID from Firebase"""
+    print(f"Deleting presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        doc_ref.delete()
+        return {"message": "Presentation deleted successfully", "id": presentation_id}
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error deleting presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to delete presentation: {str(e)}')
