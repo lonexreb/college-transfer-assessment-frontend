@@ -229,9 +229,33 @@ const ComparisonTool = () => {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
+          if (line.trim() === '') continue;
+
+          console.log('Received raw line:', line);
+
+          // Handle different streaming formats more robustly
+          let jsonStr = '';
+          let data = null;
+
+          // Try to extract JSON from different line formats
           if (line.startsWith('data: ')) {
+            jsonStr = line.slice(6).trim();
+          } else if (line.startsWith('{') && line.endsWith('}')) {
+            // Handle pure JSON lines
+            jsonStr = line.trim();
+          } else if (line.includes('{') && line.includes('}')) {
+            // Extract JSON from lines that contain other text
+            const jsonMatch = line.match(/\{.*\}/);
+            if (jsonMatch) {
+              jsonStr = jsonMatch[0];
+            }
+          }
+
+          // Try to parse JSON if we found any
+          if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
             try {
-              const data = JSON.parse(line.slice(6));
+              data = JSON.parse(jsonStr);
+              console.log('Parsed streaming data:', data);
 
               switch(data.type) {
                 case 'schools_data':
@@ -404,27 +428,35 @@ const ComparisonTool = () => {
 
             console.log('Received raw line:', line);
 
-            // Handle different SSE formats
-            if (line.startsWith('data: ') || line.startsWith('event:') || line.includes('{')) {
-              let jsonStr = '';
+            // Handle different streaming formats more robustly
+            let jsonStr = '';
+            let data = null;
 
-              if (line.startsWith('data: ')) {
-                jsonStr = line.slice(6).trim();
-              } else if (line.startsWith('{')) {
-                // Handle lines that are pure JSON without "data: " prefix
-                jsonStr = line.trim();
+            // Try to extract JSON from different line formats
+            if (line.startsWith('data: ')) {
+              jsonStr = line.slice(6).trim();
+            } else if (line.startsWith('{') && line.endsWith('}')) {
+              // Handle pure JSON lines
+              jsonStr = line.trim();
+            } else if (line.includes('{') && line.includes('}')) {
+              // Extract JSON from lines that contain other text
+              const jsonMatch = line.match(/\{.*\}/);
+              if (jsonMatch) {
+                jsonStr = jsonMatch[0];
               }
+            }
 
-              if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
+            // Try to parse JSON if we found any
+            if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
               try {
-                const data = JSON.parse(jsonStr);
-                console.log('Parsed SSE data:', data);
+                data = JSON.parse(jsonStr);
+                console.log('Parsed streaming data:', data);
 
                 // Handle different progress update formats from backend
                 if (data.progress !== undefined && typeof data.progress === 'number') {
                   console.log('Setting progress to:', data.progress);
                   setPresentationProgress(Math.min(100, Math.max(0, data.progress)));
-                  
+
                   // Clear fallback progress simulation since we're getting real updates
                   if (progressSimulation) {
                     clearInterval(progressSimulation);
@@ -436,7 +468,7 @@ const ComparisonTool = () => {
                 if (data.percentage !== undefined && typeof data.percentage === 'number') {
                   console.log('Setting percentage to:', data.percentage);
                   setPresentationProgress(Math.min(100, Math.max(0, data.percentage)));
-                  
+
                   if (progressSimulation) {
                     clearInterval(progressSimulation);
                     setProgressSimulation(null);
@@ -455,10 +487,10 @@ const ComparisonTool = () => {
                     const estimatedTotalSteps = 8; // Based on your backend code
                     stepProgress = (data.step / estimatedTotalSteps) * 100;
                   }
-                  
+
                   console.log('Calculating step progress:', stepProgress, `(step ${data.step})`);
                   setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
-                  
+
                   if (progressSimulation) {
                     clearInterval(progressSimulation);
                     setProgressSimulation(null);
@@ -515,7 +547,6 @@ const ComparisonTool = () => {
 
               } catch (parseError) {
                 console.error('Failed to parse SSE data:', parseError, 'Raw line:', line, 'JSON string:', jsonStr);
-              }
               }
             } else {
               // Handle non-JSON lines that might contain status info
