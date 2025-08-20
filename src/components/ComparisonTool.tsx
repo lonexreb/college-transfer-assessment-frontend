@@ -78,6 +78,22 @@ const ComparisonTool = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  // Cleanup presentation generation on component unmount
+  useEffect(() => {
+    return () => {
+      if (isGeneratingPresentation) {
+        console.log('🧹 Cleaning up presentation generation on unmount');
+        setIsGeneratingPresentation(false);
+        setPresentationProgress(0);
+        setPresentationStepMessage('');
+        if (progressSimulation) {
+          clearInterval(progressSimulation);
+          setProgressSimulation(null);
+        }
+      }
+    };
+  }, [isGeneratingPresentation, progressSimulation]);
+
   // Load assessment config from wizard or saved comparison for viewing
   useEffect(() => {
     // Check for saved comparison to view
@@ -367,17 +383,8 @@ const ComparisonTool = () => {
     setError(null);
     setPresentationResult(null);
 
-    // Start a fallback progress simulation
-    let simulatedProgress = 0;
-    const progressInterval = setInterval(() => {
-      simulatedProgress += Math.random() * 10;
-      if (simulatedProgress < 90) {
-        setPresentationProgress(simulatedProgress);
-      }
-    }, 2000);
-    setProgressSimulation(progressInterval);
-
     try {
+      // Create form data
       const formData = new FormData();
       formData.append('prompt', `School Comparison Analysis: ${comparisonResult.ai_report}`);
       formData.append('n_slides', '8');
@@ -385,219 +392,129 @@ const ComparisonTool = () => {
       formData.append('template', 'general');
       formData.append('export_as', 'pptx');
 
-      console.log('Starting presentation generation request...');
+      console.log('🚀 Starting presentation generation with SSE...');
 
+      // Make POST request and handle SSE response
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/v1/ppt/generate/presentation', {
         method: 'POST',
         body: formData,
         headers: {
-          'Accept': 'text/event-stream, application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to generate presentation: ${response.status}`);
+        throw new Error(`Failed to start presentation generation: ${response.status}`);
       }
 
-      console.log('Response received, checking content type...');
-      const contentType = response.headers.get('content-type');
-      console.log('Content-Type:', contentType);
+      console.log('📡 Processing SSE response...');
+      
+      // Handle SSE response from the POST request
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Always try to handle as streaming first since your backend uses StreamingResponse
-      if (response.body) {
-        console.log('Processing streaming response...');
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
 
-        let buffer = '';
+      let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
+      while (true) {
+        const { done, value } = await reader.read();
 
-          if (done) {
-            console.log('Stream completed');
-            break;
-          }
+        if (done) {
+          console.log('✅ SSE stream completed');
+          break;
+        }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-          for (const line of lines) {
-            if (line.trim() === '') continue;
+        for (const line of lines) {
+          if (line.trim() === '') continue;
 
-            console.log('🔴 RECEIVED RAW LINE:', JSON.stringify(line));
-            console.log('📏 LINE LENGTH:', line.length);
-            console.log('🔠 LINE CONTENT:', line);
+          console.log('📨 RECEIVED SSE LINE:', line);
 
-            // Handle different streaming formats more robustly
-            let jsonStr = '';
-            let data = null;
-
-            // Try to extract JSON from different line formats
-            if (line.startsWith('data: ')) {
-              jsonStr = line.slice(6).trim();
-            } else if (line.startsWith('{') && line.endsWith('}')) {
-              // Handle pure JSON lines
-              jsonStr = line.trim();
-            } else if (line.includes('{') && line.includes('}')) {
-              // Extract JSON from lines that contain other text
-              const jsonMatch = line.match(/\{.*\}/);
-              if (jsonMatch) {
-                jsonStr = jsonMatch[0];
-              }
+          // Parse SSE format: "data: {...}"
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            
+            if (jsonStr === '[DONE]') {
+              console.log('🏁 Received [DONE] signal');
+              continue;
             }
 
-            // Try to parse JSON if we found any
-            if (jsonStr && jsonStr !== '' && jsonStr !== '[DONE]') {
-              try {
-                data = JSON.parse(jsonStr);
-                console.log('🔍 RAW JSON STRING:', jsonStr);
-                console.log('📦 PARSED DATA:', data);
-                console.log('🏷️ DATA TYPE:', typeof data);
-                console.log('🔑 DATA KEYS:', Object.keys(data));
+            try {
+              const data = JSON.parse(jsonStr);
+              console.log('📦 PARSED SSE DATA:', data);
 
-                // Handle different progress update formats from backend
-                if (data.progress !== undefined && typeof data.progress === 'number') {
-                  console.log('Setting progress to:', data.progress);
-                  setPresentationProgress(Math.min(100, Math.max(0, data.progress)));
-
-                  // Clear fallback progress simulation since we're getting real updates
-                  if (progressSimulation) {
-                    clearInterval(progressSimulation);
-                    setProgressSimulation(null);
-                  }
-                }
-
-                // Handle percentage-based progress
-                if (data.percentage !== undefined && typeof data.percentage === 'number') {
-                  console.log('Setting percentage to:', data.percentage);
-                  setPresentationProgress(Math.min(100, Math.max(0, data.percentage)));
-
-                  if (progressSimulation) {
-                    clearInterval(progressSimulation);
-                    setProgressSimulation(null);
-                  }
-                }
-
-                // Handle step-based progress (like from your backend)
-                if (data.step !== undefined) {
-                  // Your backend seems to use steps 1-8+ for an 8-slide presentation
-                  // Estimate progress based on step number
-                  let stepProgress = 0;
-                  if (data.total_steps !== undefined) {
-                    stepProgress = (data.step / data.total_steps) * 100;
-                  } else {
-                    // Estimate based on typical presentation generation steps
-                    const estimatedTotalSteps = 8; // Based on your backend code
-                    stepProgress = (data.step / estimatedTotalSteps) * 100;
-                  }
-
-                  console.log('Calculating step progress:', stepProgress, `(step ${data.step})`);
-                  setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
-
-                  if (progressSimulation) {
-                    clearInterval(progressSimulation);
-                    setProgressSimulation(null);
-                  }
-                }
-
-                // Handle all message types - show every message that comes through
-                let messageToShow = '';
-
-                // Try to extract a message from various possible fields
-                if (data.step && data.message) {
-                  messageToShow = `Step ${data.step}: ${data.message}`;
-                  console.log('✅ Setting step message:', messageToShow);
-                } else if (data.message && typeof data.message === 'string') {
-                  messageToShow = data.message;
-                  console.log('✅ Setting message:', messageToShow);
-                } else if (data.status && typeof data.status === 'string') {
-                  messageToShow = data.status;
-                  console.log('✅ Setting status message:', messageToShow);
-                } else if (data.text && typeof data.text === 'string') {
-                  messageToShow = data.text;
-                  console.log('✅ Setting text message:', messageToShow);
-                } else if (data.content && typeof data.content === 'string') {
-                  messageToShow = data.content;
-                  console.log('✅ Setting content message:', messageToShow);
-                } else if (typeof data === 'string') {
-                  messageToShow = data;
-                  console.log('✅ Setting string data as message:', messageToShow);
-                } else {
-                  // Log what we received if we can't find a message
-                  console.log('⚠️ No recognizable message field found in data:', data);
-                }
-
-                // Update the message display for any valid message
-                if (messageToShow) {
-                  console.log('🔄 UPDATING PRESENTATION MESSAGE TO:', messageToShow);
-                  setPresentationStepMessage(messageToShow);
-                } else {
-                  console.log('❌ No message to show from this data chunk');
-                }
-
-                // Handle completion indicators
-                if (data.complete || data.result || data.presentation_id || data.download_url) {
-                  console.log('Presentation generation complete:', data);
-
-                  // Handle different response formats
-                  const result = data.result || data;
-                  setPresentationResult(result);
-                  setPresentationProgress(100);
-                  setPresentationStepMessage('Presentation generation complete!');
-
-                  setTimeout(() => {
-                    setIsGeneratingPresentation(false);
-                    setPresentationProgress(0);
-                    setPresentationStepMessage('');
-                  }, 2000);
-                  return;
-                }
-
-                // Handle streaming content (text chunks)
-                if (data.content && typeof data.content === 'string') {
-                  console.log('Received content chunk:', data.content.substring(0, 50) + '...');
-                  setPresentationStepMessage('Generating presentation content...');
-                }
-
-                if (data.error) {
-                  throw new Error(data.error);
-                }
-
-              } catch (parseError) {
-                console.error('Failed to parse SSE data:', parseError, 'Raw line:', line, 'JSON string:', jsonStr);
+              // Handle progress updates
+              if (data.progress !== undefined && typeof data.progress === 'number') {
+                console.log('📊 Setting progress to:', data.progress);
+                setPresentationProgress(Math.min(100, Math.max(0, data.progress)));
               }
-            } else {
-              // Handle non-JSON lines that might contain status info
-              console.log('Non-JSON line received:', line);
+
+              // Handle step-based progress
+              if (data.step !== undefined) {
+                const stepProgress = (data.step / 8) * 100; // Assuming 8 steps total
+                console.log('📈 Setting step progress:', stepProgress, `(step ${data.step})`);
+                setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
+              }
+
+              // Handle status messages
+              let messageToShow = '';
+              if (data.step && data.message) {
+                messageToShow = `Step ${data.step}: ${data.message}`;
+              } else if (data.message) {
+                messageToShow = data.message;
+              } else if (data.status) {
+                messageToShow = data.status;
+              }
+
+              if (messageToShow) {
+                console.log('💬 UPDATING MESSAGE TO:', messageToShow);
+                setPresentationStepMessage(messageToShow);
+              }
+
+              // Handle completion
+              if (data.complete || data.result || data.presentation_id) {
+                console.log('🎉 Presentation generation complete:', data);
+                
+                const result = data.result || data;
+                setPresentationResult(result);
+                setPresentationProgress(100);
+                setPresentationStepMessage('Presentation generation complete!');
+
+                setTimeout(() => {
+                  setIsGeneratingPresentation(false);
+                  setPresentationProgress(0);
+                  setPresentationStepMessage('');
+                }, 2000);
+                
+                return; // Exit the function
+              }
+
+              // Handle errors
+              if (data.error) {
+                throw new Error(data.error);
+              }
+
+            } catch (parseError) {
+              console.error('❌ Failed to parse SSE data:', parseError, 'JSON string:', jsonStr);
             }
           }
         }
-
-        // If we reach here without getting a result, something went wrong
-        throw new Error('Stream ended without receiving presentation result');
-
-      } else {
-        // Fallback to regular JSON response
-        console.log('Handling as regular JSON response...');
-        const result = await response.json();
-        console.log('JSON result:', result);
-        setPresentationProgress(100);
-        setPresentationResult(result);
       }
+
+      // If we reach here without getting a result, something went wrong
+      throw new Error('Stream ended without receiving presentation result');
 
     } catch (error) {
-      console.error('Presentation generation error:', error);
+      console.error('🚨 Presentation generation error:', error);
       setError(`Failed to generate presentation: ${error.message}`);
-    } finally {
-      // Clear progress simulation
-      if (progressSimulation) {
-        clearInterval(progressSimulation);
-        setProgressSimulation(null);
-      }
-
-      // Small delay to show 100% before clearing
+      
       setTimeout(() => {
         setIsGeneratingPresentation(false);
         setPresentationProgress(0);
