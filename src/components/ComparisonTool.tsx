@@ -420,40 +420,65 @@ const ComparisonTool = () => {
                 const data = JSON.parse(jsonStr);
                 console.log('Parsed SSE data:', data);
 
-                // Handle different progress update formats
+                // Handle different progress update formats from backend
                 if (data.progress !== undefined && typeof data.progress === 'number') {
                   console.log('Setting progress to:', data.progress);
                   setPresentationProgress(Math.min(100, Math.max(0, data.progress)));
+                  
+                  // Clear fallback progress simulation since we're getting real updates
+                  if (progressSimulation) {
+                    clearInterval(progressSimulation);
+                    setProgressSimulation(null);
+                  }
                 }
 
                 // Handle percentage-based progress
                 if (data.percentage !== undefined && typeof data.percentage === 'number') {
                   console.log('Setting percentage to:', data.percentage);
                   setPresentationProgress(Math.min(100, Math.max(0, data.percentage)));
+                  
+                  if (progressSimulation) {
+                    clearInterval(progressSimulation);
+                    setProgressSimulation(null);
+                  }
                 }
 
-                // Handle step-based progress
-                if (data.step !== undefined && data.total_steps !== undefined) {
-                  const stepProgress = (data.step / data.total_steps) * 100;
-                  console.log('Calculating step progress:', stepProgress, `(${data.step}/${data.total_steps})`);
+                // Handle step-based progress (like from your backend)
+                if (data.step !== undefined) {
+                  // Your backend seems to use steps 1-8+ for an 8-slide presentation
+                  // Estimate progress based on step number
+                  let stepProgress = 0;
+                  if (data.total_steps !== undefined) {
+                    stepProgress = (data.step / data.total_steps) * 100;
+                  } else {
+                    // Estimate based on typical presentation generation steps
+                    const estimatedTotalSteps = 8; // Based on your backend code
+                    stepProgress = (data.step / estimatedTotalSteps) * 100;
+                  }
+                  
+                  console.log('Calculating step progress:', stepProgress, `(step ${data.step})`);
                   setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
+                  
+                  if (progressSimulation) {
+                    clearInterval(progressSimulation);
+                    setProgressSimulation(null);
+                  }
                 }
 
                 // Handle status messages
-                if (data.status && typeof data.status === 'string') {
-                  console.log('Setting status message:', data.status);
-                  setPresentationStepMessage(data.status);
-                }
-
                 if (data.message && typeof data.message === 'string') {
                   console.log('Setting message:', data.message);
                   setPresentationStepMessage(data.message);
                 }
 
-                // Handle step with message
-                if (data.step && (data.message || data.status)) {
-                  const message = data.message || data.status || 'Processing...';
-                  const stepMessage = `Step ${data.step}: ${message}`;
+                if (data.status && typeof data.status === 'string') {
+                  console.log('Setting status message:', data.status);
+                  setPresentationStepMessage(data.status);
+                }
+
+                // Handle step with message (your backend format)
+                if (data.step && data.message) {
+                  const stepMessage = `Step ${data.step}: ${data.message}`;
                   console.log('Setting step message:', stepMessage);
                   setPresentationStepMessage(stepMessage);
                 }
