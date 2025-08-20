@@ -1,0 +1,61 @@
+1. Set Up Server-Sent Events (SSE) Connection
+Your React component needs to establish an EventSource connection to /api/v1/ppt/generate/presentation when the user submits the form. This will allow you to receive real-time streaming updates from the backend.
+
+2. Handle Form Data Submission
+Since your API expects form data (not JSON), you'll need to create a FormData object with the required fields:
+
+prompt (required)
+n_slides (default: 5)
+language (default: "English")
+template (default: "general")
+export_as (default: "pptx")
+3. Parse Streaming Response Format
+Your backend sends data in this format:
+
+data: {"step": 1, "message": "Starting presentation generation...", "progress": 5}
+Each message contains:
+
+step: Current step number (1-8)
+message: User-friendly status message
+progress: Percentage completion (0-100)
+complete: Boolean flag when finished
+result: Final presentation data (only in last message)
+4. State Management Strategy
+You'll need React state for:
+
+Loading state: Track if generation is in progress
+Progress: Current percentage (0-100)
+Current step: Which step is active (1-8)
+Status message: What's currently happening
+Result data: Final presentation information
+Error state: Handle any errors
+5. Progress Display Implementation
+Show users these 8 distinct steps:
+
+"Starting presentation generation..." (5%)
+"Loading presentation template..." (10%)
+"Processing input prompt..." (20%)
+"Creating presentation structure..." (30-55% with incremental updates)
+"Generating presentation..." (60%)
+"Finalizing presentation..." (80%)
+"Saving presentation..." (90%)
+"Presentation ready!" (100%)
+6. Handle the Final Result
+When complete: true is received, the result object contains:
+
+presentation_id: Unique ID for the presentation
+path: Direct access URL
+edit_path: Edit URL (e.g., /edit/{id})
+static_url: Static file URL
+share_link: Shareable URL
+original_prompt: User's input
+status: "completed"
+7. Error Handling
+Watch for error messages in the stream format:
+
+data: {"error": "Error message", "complete": true}
+8. Connection Management
+Close the EventSource connection when component unmounts
+Handle connection errors and timeouts
+Provide retry functionality for failed generations
+Show appropriate loading states during connection establishment
