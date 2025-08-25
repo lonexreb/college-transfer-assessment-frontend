@@ -90,8 +90,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Check if email is verified before allowing MFA setup
-    await reload(currentUser);
-    if (!currentUser.emailVerified) {
+    const userToCheck = auth.currentUser;
+    if (!userToCheck) {
+      throw new Error('User not authenticated');
+    }
+    
+    await reload(userToCheck);
+    if (!userToCheck.emailVerified) {
       throw new Error('Please verify your email address before setting up multi-factor authentication');
     }
 
@@ -170,9 +175,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user is currently signed in');
     }
 
-    await reload(currentUser);
+    // Create a fresh user instance to avoid modifying the current state
+    const userToReload = auth.currentUser;
+    if (!userToReload) {
+      throw new Error('No user is currently signed in');
+    }
+
+    await reload(userToReload);
     
-    if (!currentUser.emailVerified) {
+    if (!userToReload.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
   }
