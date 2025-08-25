@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (user) {
         try {
-          await user.sendEmailVerification();
+          await sendEmailVerification(user);
           console.log('Email verification sent to:', user.email);
         } catch (emailError) {
           console.error('Failed to send verification email:', emailError);
