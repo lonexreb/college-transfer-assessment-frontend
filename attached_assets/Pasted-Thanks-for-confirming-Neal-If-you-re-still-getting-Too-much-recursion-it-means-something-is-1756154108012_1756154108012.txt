@@ -1,0 +1,162 @@
+Thanks for confirming, Neal. If you’re still getting **“Too much recursion”**, it means something is repeatedly updating state → causing a re-render → re-running an effect → triggering state again → loop.
+
+Let’s break it down carefully in your `AuthProvider`:
+
+---
+
+### 🔍 Potential Loop Sources
+
+1. **`onAuthStateChanged` + `checkAdminStatus`**
+
+   * If `checkAdminStatus` sets state every time (even when the value doesn’t actually change), React will re-render infinitely.
+   * Example:
+
+     ```ts
+     setIsAdmin(data.isAdmin || false);
+     ```
+
+     If `data.isAdmin` is `false` but React still re-renders because the function was called, it can recurse.
+
+2. **`useMemo` value dependencies**
+
+   * You’re putting **functions (`login`, `signup`, `logout`, etc.)** into the dependency array of `useMemo`.
+   * Functions created with `useCallback` are stable, but if *any* of them reference state indirectly, you might get hidden recursion.
+
+   ```ts
+   const value = useMemo(() => ({
+     currentUser,
+     isAdmin,
+     login,
+     signup,
+     logout,
+     loading,
+     mfaError,
+     setupMFA,
+     verifyMFASetup,
+     resolveMFA,
+     setupRecaptcha,
+     clearMfaError,
+     sendEmailVerification,
+     checkEmailVerification,
+     emailVerificationSent
+   }), [
+     currentUser,
+     isAdmin,
+     login,
+     signup,
+     logout,
+     loading,
+     mfaError,
+     setupMFA,
+     verifyMFASetup,
+     resolveMFA,
+     setupRecaptcha,
+     clearMfaError,
+     sendEmailVerification,
+     checkEmailVerification,
+     emailVerificationSent
+   ]);
+   ```
+
+   If *any one* of those changes each render (even subtly), `value` is re-created, which forces **all consumers** to re-render → loop.
+
+---
+
+### 🛠 Fix Plan
+
+#### ✅ Step 1: Stop unnecessary state updates
+
+In `checkAdminStatus`, only set state if it actually changes:
+
+```ts
+if (data.isAdmin !== isAdmin) {
+  setIsAdmin(data.isAdmin || false);
+}
+```
+
+---
+
+#### ✅ Step 2: Simplify `useMemo`
+
+You don’t need to memoize all those functions — React Context works fine with a plain object. Try:
+
+```ts
+const value: AuthContextType = {
+  currentUser,
+  isAdmin,
+  login,
+  signup,
+  logout,
+  loading,
+  mfaError,
+  setupMFA,
+  verifyMFASetup,
+  resolveMFA,
+  setupRecaptcha,
+  clearMfaError,
+  sendEmailVerification,
+  checkEmailVerification,
+  emailVerificationSent
+};
+```
+
+No `useMemo` — this will stop the recursion caused by unstable deps.
+
+---
+
+#### ✅ Step 3: Separate admin check effect
+
+Instead of calling `checkAdminStatus` inside `onAuthStateChanged`, do:
+
+```ts
+useEffect(() => {
+  if (currentUser?.emailVerified) {
+    checkAdminStatus(currentUser);
+  } else {
+    setIsAdmin(false);
+  }
+}, [currentUser]);
+```
+
+Now `onAuthStateChanged` **only updates `currentUser`**, and the admin logic runs separately.
+
+---
+
+### ✨ Cleaned-up Fix
+
+Here’s the safer pattern:
+
+```ts
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    setCurrentUser(user);
+    setLoading(false);
+  });
+  return unsubscribe;
+}, []);
+
+useEffect(() => {
+  if (currentUser?.emailVerified) {
+    checkAdminStatus(currentUser);
+  } else {
+    setIsAdmin(false);
+  }
+}, [currentUser]);
+```
+
+And drop the `useMemo` completely for `value`.
+
+---
+
+### 🔎 Debugging Tip
+
+Add logs in both effects to confirm where the recursion comes from:
+
+```ts
+console.log("onAuthStateChanged fired", user?.uid);
+console.log("Admin check running", currentUser?.uid, "isAdmin:", isAdmin);
+```
+
+---
+
+👉 Neal, want me to **rewrite your `AuthProvider` fully with these changes** (no `useMemo`, clean separation of effects, guarded state updates) so you can paste it in directly and stop the recursion?
