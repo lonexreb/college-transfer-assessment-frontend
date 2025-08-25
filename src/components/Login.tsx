@@ -22,9 +22,7 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
   const [loading, setLoading] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [showMFA, setShowMFA] = useState(false);
-  const [showEmailVerification, setShowEmailVerification] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha, sendEmailVerification, checkEmailVerification, emailVerificationSent } = useAuth();
+  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha } = useAuth();
 
   useEffect(() => {
     if (mfaError) {
@@ -46,14 +44,8 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
       setLoading(true);
       
       if (isSignupMode) {
-        try {
-          await signup(email, password);
-          console.log('Signup completed, should have sent verification email');
-          setShowEmailVerification(true);
-        } catch (signupError) {
-          console.error('Signup error:', signupError);
-          throw signupError;
-        }
+        await signup(email, password);
+        // Signup completed - email verification is handled in the signup process
       } else {
         await login(email, password);
       }
@@ -91,108 +83,9 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
     setError('');
   }
 
-  async function handleEmailVerification(e: React.FormEvent) {
-    e.preventDefault();
-    
-    try {
-      setError('');
-      setLoading(true);
-      await checkEmailVerification();
-      setShowEmailVerification(false);
-      // User will be redirected by the auth context after verification
-    } catch (error: any) {
-      setError(error.message || 'Email not yet verified');
-    } finally {
-      setLoading(false);
-    }
-  }
+  
 
-  async function handleSendEmailVerification() {
-    try {
-      setError('');
-      setSendingEmail(true);
-      await sendEmailVerification();
-    } catch (error: any) {
-      setError(error.message || 'Failed to send verification email');
-    } finally {
-      setSendingEmail(false);
-    }
-  }
-
-  function handleBackToSignup() {
-    setShowEmailVerification(false);
-    setError('');
-  }
-
-  if (showEmailVerification) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
-              Verify Your Email
-            </CardTitle>
-            <CardDescription className="text-center">
-              {emailVerificationSent 
-                ? `We've sent a verification link to ${email}. Please check your email and click the link.`
-                : `Please send a verification email to ${email} and then click the link in your email.`
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleEmailVerification} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              {!emailVerificationSent && (
-                <Button 
-                  type="button"
-                  onClick={handleSendEmailVerification}
-                  className="w-full mb-4"
-                  disabled={sendingEmail}
-                >
-                  {sendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send Verification Email
-                </Button>
-              )}
-              
-              {emailVerificationSent && (
-                <Alert>
-                  <AlertDescription>
-                    After clicking the verification link in your email, come back here and click the button below.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={loading}
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                I've Verified My Email
-              </Button>
-            </form>
-            
-            <div className="mt-4 text-center">
-              <Button
-                type="button"
-                variant="link"
-                className="p-0 h-auto font-normal"
-                onClick={handleBackToSignup}
-                disabled={loading}
-              >
-                Back to Signup
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  
 
   if (showMFA) {
     return (

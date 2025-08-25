@@ -33,9 +33,6 @@ interface AuthContextType {
   resolveMFA: (verificationCode: string) => Promise<void>;
   setupRecaptcha: (elementId: string) => void;
   clearMfaError: () => void;
-  sendEmailVerification: () => Promise<void>;
-  checkEmailVerification: () => Promise<void>;
-  emailVerificationSent: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -50,7 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mfaError, setMfaError] = useState<MultiFactorError | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
-  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
   
   // Use useRef to hold RecaptchaVerifier to avoid re-initializing
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -214,39 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMfaResolver(null);
   }, []);
 
-  const sendEmailVerification = useCallback(async () => {
-    if (!currentUser) {
-      throw new Error('No user is currently signed in');
-    }
-
-    try {
-      await sendEmailVerification(currentUser);
-      setEmailVerificationSent(true);
-      console.log('Email verification sent to:', currentUser.email);
-    } catch (error: any) {
-      console.error('Failed to send verification email:', error);
-      throw new Error('Failed to send verification email: ' + error.message);
-    }
-  }, [currentUser]);
-
-  const checkEmailVerification = useCallback(async () => {
-    if (!currentUser) {
-      throw new Error('No user is currently signed in');
-    }
-
-    try {
-      await reload(currentUser);
-      if (currentUser.emailVerified) {
-        setEmailVerificationSent(false);
-        console.log('Email verification confirmed');
-      } else {
-        throw new Error('Email not yet verified. Please check your email and click the verification link.');
-      }
-    } catch (error: any) {
-      console.error('Email verification check failed:', error);
-      throw error;
-    }
-  }, [currentUser]);
+  
 
   
 
@@ -317,10 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     verifyMFASetup,
     resolveMFA,
     setupRecaptcha,
-    clearMfaError,
-    sendEmailVerification,
-    checkEmailVerification,
-    emailVerificationSent
+    clearMfaError
   };
 
   return (
