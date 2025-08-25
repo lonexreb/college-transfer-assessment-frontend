@@ -8,6 +8,7 @@ import ReportDisplay from "./components/ReportDisplay";
 import Dashboard from "./components/Dashboard";
 import ComparisonTool from "./components/ComparisonTool";
 import Chatbot from "./components/Chatbot";
+import MFASetup from "./components/MFASetup";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/assessment/new" element={<AssessmentWizard />} />
               <Route path="/comparison" element={<ComparisonTool />} />
+              <Route path="/mfa-setup" element={<MFASetup />} />
               <Route path="/report/:id" element={<ReportDisplay />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<Navigate to="/" replace />} />

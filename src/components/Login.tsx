@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 
 interface LoginProps {
   onToggleMode: () => void;
@@ -20,7 +20,17 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, signup } = useAuth();
+  const [mfaCode, setMfaCode] = useState('');
+  const [showMFA, setShowMFA] = useState(false);
+  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha } = useAuth();
+
+  useEffect(() => {
+    if (mfaError) {
+      setShowMFA(true);
+      setLoading(false);
+      setupRecaptcha('recaptcha-container');
+    }
+  }, [mfaError, setupRecaptcha]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,10 +49,100 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
         await login(email, password);
       }
     } catch (error: any) {
+      if (error.message === 'MFA_REQUIRED') {
+        // MFA will be handled by the useEffect hook
+        return;
+      }
       setError(error.message || 'Failed to authenticate');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleMFASubmit(e: React.FormEvent) {
+    e.preventDefault();
+    
+    try {
+      setError('');
+      setLoading(true);
+      await resolveMFA(mfaCode);
+      setShowMFA(false);
+      setMfaCode('');
+    } catch (error: any) {
+      setError(error.message || 'Invalid verification code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleBackToLogin() {
+    setShowMFA(false);
+    setMfaCode('');
+    clearMfaError();
+    setError('');
+  }
+
+  if (showMFA) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
+              <Phone className="h-6 w-6" />
+              Phone Verification
+            </CardTitle>
+            <CardDescription className="text-center">
+              Enter the verification code sent to your registered phone number
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleMFASubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="mfaCode">Verification Code</Label>
+                <Input
+                  id="mfaCode"
+                  type="text"
+                  placeholder="123456"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  required
+                  disabled={loading}
+                  maxLength={6}
+                />
+              </div>
+              
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={loading || mfaCode.length !== 6}
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Verify Code
+              </Button>
+            </form>
+            
+            <div className="mt-4 text-center">
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 h-auto font-normal"
+                onClick={handleBackToLogin}
+                disabled={loading}
+              >
+                Back to Login
+              </Button>
+            </div>
+            <div id="recaptcha-container"></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -148,6 +248,7 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
               {isSignupMode ? 'Sign in' : 'Sign up'}
             </Button>
           </div>
+          <div id="recaptcha-container" className="hidden"></div>
         </CardContent>
       </Card>
     </div>
