@@ -22,16 +22,36 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <Routes>
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/assessment/new" element={
+              <ProtectedRoute>
+                <AssessmentWizard />
+              </ProtectedRoute>
+            } />
+            <Route path="/comparison" element={
+              <ProtectedRoute>
+                <ComparisonTool />
+              </ProtectedRoute>
+            } />
+            <Route path="/mfa-setup" element={
+              <ProtectedRoute>
+                <MFASetup />
+              </ProtectedRoute>
+            } />
+            <Route path="/report/:id" element={
+              <ProtectedRoute>
+                <ReportDisplay />
+              </ProtectedRoute>
+            } />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
           <ProtectedRoute>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/assessment/new" element={<AssessmentWizard />} />
-              <Route path="/comparison" element={<ComparisonTool />} />
-              <Route path="/mfa-setup" element={<MFASetup />} />
-              <Route path="/report/:id" element={<ReportDisplay />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
             <Chatbot />
           </ProtectedRoute>
         </BrowserRouter>
