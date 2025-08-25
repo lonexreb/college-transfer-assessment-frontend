@@ -90,14 +90,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Check if email is verified before allowing MFA setup
-    const userToCheck = auth.currentUser;
-    if (!userToCheck) {
+    // Use a fresh reference to avoid state mutation issues
+    const freshUser = auth.currentUser;
+    if (!freshUser) {
       throw new Error('User not authenticated');
     }
     
-    await reload(userToCheck);
-    if (!userToCheck.emailVerified) {
-      throw new Error('Please verify your email address before setting up multi-factor authentication');
+    // Reload user data only if necessary
+    if (!freshUser.emailVerified) {
+      await reload(freshUser);
+      if (!freshUser.emailVerified) {
+        throw new Error('Please verify your email address before setting up multi-factor authentication');
+      }
     }
 
     const multiFactorSession = await multiFactor(currentUser).getSession();
@@ -171,19 +175,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function checkEmailVerification() {
-    if (!currentUser) {
+    const freshUser = auth.currentUser;
+    if (!freshUser) {
       throw new Error('No user is currently signed in');
     }
 
-    // Create a fresh user instance to avoid modifying the current state
-    const userToReload = auth.currentUser;
-    if (!userToReload) {
-      throw new Error('No user is currently signed in');
-    }
-
-    await reload(userToReload);
+    // Only reload if we need fresh verification status
+    await reload(freshUser);
     
-    if (!userToReload.emailVerified) {
+    if (!freshUser.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
   }
@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(false); // Don't force refresh to avoid loops
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/admin/check', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -219,7 +219,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
+      // Only update state if the user actually changed
+      setCurrentUser(prevUser => {
+        if (prevUser?.uid !== user?.uid) {
+          return user;
+        }
+        return prevUser;
+      });
+      
       await checkAdminStatus(user);
       setLoading(false);
     });
