@@ -14,7 +14,9 @@ import {
   linkWithCredential,
   multiFactor,
   PhoneMultiFactorGenerator,
-  MultiFactorError
+  MultiFactorError,
+  sendEmailVerification,
+  reload
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -31,6 +33,8 @@ interface AuthContextType {
   resolveMFA: (verificationCode: string) => Promise<void>;
   setupRecaptcha: (elementId: string) => void;
   clearMfaError: () => void;
+  sendEmailVerification: () => Promise<void>;
+  checkEmailVerification: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -83,6 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function setupMFA(phoneNumber: string): Promise<ConfirmationResult> {
     if (!currentUser || !recaptchaVerifier) {
       throw new Error('User not authenticated or reCAPTCHA not set up');
+    }
+
+    // Check if email is verified before allowing MFA setup
+    await reload(currentUser);
+    if (!currentUser.emailVerified) {
+      throw new Error('Please verify your email address before setting up multi-factor authentication');
     }
 
     const multiFactorSession = await multiFactor(currentUser).getSession();
@@ -143,6 +153,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMfaResolver(null);
   }
 
+  async function sendEmailVerification() {
+    if (!currentUser) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    if (currentUser.emailVerified) {
+      throw new Error('Email is already verified');
+    }
+
+    await sendEmailVerification(currentUser);
+  }
+
+  async function checkEmailVerification() {
+    if (!currentUser) {
+      throw new Error('No user is currently signed in');
+    }
+
+    await reload(currentUser);
+    
+    if (!currentUser.emailVerified) {
+      throw new Error('Email is not yet verified. Please check your email and click the verification link.');
+    }
+  }
+
   const checkAdminStatus = async (user: User | null) => {
     if (!user) {
       setIsAdmin(false);
@@ -194,7 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     verifyMFASetup,
     resolveMFA,
     setupRecaptcha,
-    clearMfaError
+    clearMfaError,
+    sendEmailVerification,
+    checkEmailVerification
   };
 
   return (
