@@ -52,10 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   // Use useRef to hold RecaptchaVerifier to avoid re-initializing
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const checkingAdminRef = useRef(false);
 
+  // Stable functions that don't depend on state
   const signup = useCallback((email: string, password: string) => {
     return createUserWithEmailAndPassword(auth, email, password).then(() => {});
-  }, []); // No dependencies - auth is stable
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -68,11 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error;
     }
-  }, []); // No dependencies - auth is stable
+  }, []);
 
   const logout = useCallback(() => {
     return signOut(auth);
-  }, []); // No dependencies - auth is stable
+  }, []);
 
   const setupRecaptcha = useCallback((elementId: string) => {
     try {
@@ -96,15 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         'expired-callback': () => {
           console.log('reCAPTCHA expired, clearing...');
-          recaptchaVerifierRef.current?.clear();
-          recaptchaVerifierRef.current = null;
+          if (recaptchaVerifierRef.current) {
+            recaptchaVerifierRef.current.clear();
+            recaptchaVerifierRef.current = null;
+          }
         }
       });
     } catch (error) {
       console.error('Failed to initialize reCAPTCHA:', error);
       recaptchaVerifierRef.current = null;
     }
-  }, []); // No dependencies - auth is stable, elementId changes don't require re-creation
+  }, []);
 
   const setupMFA = useCallback(async (phoneNumber: string): Promise<ConfirmationResult> => {
     if (!currentUser) {
@@ -158,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       throw error;
     }
-  }, [currentUser]); // Only depend on currentUser, not recaptchaVerifier
+  }, [currentUser]);
 
   const verifyMFASetup = useCallback(async (verificationCode: string, confirmationResult: ConfirmationResult) => {
     if (!currentUser) {
@@ -190,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await mfaResolver.resolveSignIn(multiFactorAssertion);
     setMfaError(null);
     setMfaResolver(null);
-  }, [mfaResolver]); // Only depend on mfaResolver, not recaptchaVerifier
+  }, [mfaResolver]);
 
   const clearMfaError = useCallback(() => {
     setMfaError(null);
@@ -208,8 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await sendEmailVerification(user);
-    // The auth listener will handle state updates after verification
-  }, []); // No dependencies to prevent recursion
+  }, []);
 
   const checkEmailVerification = useCallback(async () => {
     const user = auth.currentUser;
@@ -223,15 +226,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
+  }, []);
 
-    // User is now verified - the auth listener will handle state updates
-  }, []); // No dependencies to prevent recursion
-
-  const checkAdminStatus = useCallback(async (user: User | null) => {
-    if (!user || !user.emailVerified) {
-      setIsAdmin(false);
-      return;
-    }
+  // Separate admin check function that doesn't create dependencies
+  const checkAdminStatus = useCallback(async (user: User) => {
+    if (checkingAdminRef.current) return; // Prevent concurrent calls
+    checkingAdminRef.current = true;
 
     try {
       const token = await user.getIdToken(false);
@@ -257,8 +257,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error checking admin status:', error);
       setIsAdmin(false);
+    } finally {
+      checkingAdminRef.current = false;
     }
-  }, []); // No dependencies to prevent recursion
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -269,8 +271,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(user);
       setLoading(false);
       
-      // Handle admin status check without causing recursion
-      if (user && user.emailVerified) {
+      // Handle admin status check - only for verified users
+      if (user?.emailVerified) {
         checkAdminStatus(user);
       } else {
         setIsAdmin(false);
@@ -280,8 +282,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
       unsubscribe();
+      // Clear any ongoing admin checks
+      checkingAdminRef.current = false;
     };
-  }, []); // Remove checkAdminStatus dependency to prevent recursion
+  }, []); // Remove checkAdminStatus from dependencies to prevent recursion
 
   const value = useMemo(() => ({
     currentUser,
