@@ -1,0 +1,57 @@
+When Firebase Auth launched at Google I/O 2016, it allowed your users to create an account on your app where they signed in with an email address and a password. But this email address could be anything - as it wasn’t linked to the actual account through a verification process: so, for example, your users could identify themselves as celebrity-name@anydomain.com if they wanted to.
+
+To solve this problem, Email Verification has been added to Firebase Auth - where, in the above case, Firebase will send an email to that address containing a validation link. So if that celebrity really is signing up for your app, he’ll get the link and click on it. You can check to see if the account is verified at sign in, and take an action in response - such as blocking them from signing in.
+Exploring Email Verification
+
+Let’s see this in action. The following screenshots are taken from the Firebase Auth quickstart, available at https://github.com/firebase/quickstart-android.
+
+When you run the app, and select the Email/Password authentication activity, you’ll see this screen, where it gives you the option to sign in (if you have an account already), or create one (if you don’t).
+
+When you click the ‘Create Account’ button, you’ll get taken to a new activity, showing the user identity, and the Firebase User ID associated with it. You’ll also see that the email isn’t verified, with a button allowing you to verify it:
+
+Clicking the Verify Email button will then send an email to that address. This email will contain a link, and once the user clicks on that link, the account will be verified.
+
+This email is shown on the Email Templates tab in the Authentication section of the Firebase console. From here you can edit the action link, or the reply address so that it appears to be from your domain, instead of authui-xxxx.firebaseapp.com as shown above.
+
+Here you can see what happens once the account is verified and I sign in again.
+
+You’ll also see that this identity is present as a user in the Firebase console. You can manage them from there - including changing their password or removing them from your app altogether.
+Coding for Email Verification
+
+Details on coding for email verification can be found in the Manage Users section of the Firebase documentation (Android, iOS, Web). For the rest of this post, I’ll be looking at the Android code, but the implementation on the other platforms is very similar.
+
+The core functionality is found on the FirebaseUser object. On it is a sendEmailVerification() method, which returns as Task used to asynchronously send the email, and report on the status. If the task is successful, you know the email was sent. Here’s an example:
+
+final FirebaseUser user = mAuth.getCurrentUser();
+user.sendEmailVerification()
+  .addOnCompleteListener(this, new OnCompleteListener() {
+    @Override
+    public void onComplete(@NonNull Task task) {
+      // Re-enable button
+      findViewById(R.id.verify_email_button).setEnabled(true);
+
+      if (task.isSuccessful()) {
+        Toast.makeText(EmailPasswordActivity.this,
+          "Verification email sent to " + user.getEmail(),
+          Toast.LENGTH_SHORT).show();
+      } else {
+        Log.e(TAG, "sendEmailVerification", task.getException());
+        Toast.makeText(EmailPasswordActivity.this,
+          "Failed to send verification email.",
+          Toast.LENGTH_SHORT).show();
+      }
+    }
+  });
+
+In this case, the user is retrieved from mAuth.getCurrentUser(), and the sendEmailVerification() method is called on it. This gets Firebase to send the mail - and if the task was successful, you’ll see that a toast will pop up showing that it happened.
+
+After the user clicks the link in the email, subsequent calls to user.isEmailVerified() will return true. Here’s how it is used in the sample app:
+
+mStatusTextView.setText(getString(R.string.emailpassword_status_fmt,
+  user.getEmail(), user.isEmailVerified()));
+
+Do note that the FirebaseUser object is cached within an app session, so if you want to check on the verification state of a user, it’s a good idea to call .getCurrentUser().reload() for an update.
+
+In the sample app it just shows on the activity if the user’s email address is verified or not. For your app you could limit functionality based on this state - even to the extent of denying them access to the signed in section of the app.
+
+You can learn more about Firebase Auth, including sign-in with other providers such as Google, Facebook, Twitter and more on the Firebase developers site.
