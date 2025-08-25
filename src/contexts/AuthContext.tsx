@@ -169,43 +169,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const sendEmailVerification = useCallback(async () => {
-    if (!currentUser) {
+    const user = auth.currentUser;
+    if (!user) {
       throw new Error('No user is currently signed in');
     }
     
-    if (currentUser.emailVerified) {
+    if (user.emailVerified) {
       throw new Error('Email is already verified');
     }
 
-    await sendEmailVerification(currentUser);
-    // Force a reload to update emailVerified status immediately
-    await currentUser.reload();
-    // Update currentUser state with reloaded user
-    setCurrentUser(auth.currentUser);
-  }, [currentUser]); // Depends on currentUser which is managed by Firebase
+    await sendEmailVerification(user);
+    // The auth listener will handle state updates after verification
+  }, []); // No dependencies to prevent recursion
 
   const checkEmailVerification = useCallback(async () => {
-    if (currentUser) {
-      await currentUser.reload(); // Re-fetch the latest user data from Firebase
-      // Update currentUser state with reloaded user
-      setCurrentUser(auth.currentUser);
-      
-      if (!auth.currentUser?.emailVerified) {
-        throw new Error('Email is not yet verified. Please check your email and click the verification link.');
-      }
-    } else {
+    const user = auth.currentUser;
+    if (!user) {
       throw new Error('No user is currently signed in');
     }
-  }, [currentUser]); // Depends on currentUser
 
-  const checkAdminStatus = useCallback(async (user: User | null) => {
-    if (!user) {
-      setIsAdmin(false);
-      return;
+    // Force refresh the user to get latest verification status
+    await reload(user);
+    
+    if (!user.emailVerified) {
+      throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
 
-    // Skip admin check if email is not verified
-    if (!user.emailVerified) {
+    // User is now verified - the auth listener will handle state updates
+  }, []); // No dependencies to prevent recursion
+
+  const checkAdminStatus = useCallback(async (user: User | null) => {
+    if (!user || !user.emailVerified) {
       setIsAdmin(false);
       return;
     }
@@ -213,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const token = await user.getIdToken(false);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/admin/check', {
         headers: {
@@ -235,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error checking admin status:', error);
       setIsAdmin(false);
     }
-  }, []);
+  }, []); // No dependencies to prevent recursion
 
   useEffect(() => {
     let mounted = true;
@@ -244,23 +238,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       
       setCurrentUser(user);
+      setLoading(false);
       
-      // Clear admin status first
-      setIsAdmin(false);
-      
-      // Only check admin status for verified users
+      // Handle admin status check without causing recursion
       if (user && user.emailVerified) {
         checkAdminStatus(user);
+      } else {
+        setIsAdmin(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {
       mounted = false;
       unsubscribe();
     };
-  }, []); // Remove checkAdminStatus dependency to prevent recursion
+  }, [checkAdminStatus]); // Only depend on the stable memoized function
 
   const value = useMemo(() => ({
     currentUser,
