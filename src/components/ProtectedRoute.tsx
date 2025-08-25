@@ -25,12 +25,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <AuthPage />;
   }
 
-  // If user exists but email is not verified, the Login component will handle the verification flow
-  if (!currentUser.emailVerified) {
-    return <AuthPage />;
-  }
-
-  // User is authenticated and verified, show the protected content
+  // User is authenticated, show the protected content
   return <>{children}</>;
 };
 

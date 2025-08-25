@@ -33,9 +33,6 @@ interface AuthContextType {
   resolveMFA: (verificationCode: string) => Promise<void>;
   setupRecaptcha: (elementId: string) => void;
   clearMfaError: () => void;
-  sendEmailVerification: () => Promise<void>;
-  checkEmailVerification: () => Promise<void>;
-  emailVerificationSent: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -50,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mfaError, setMfaError] = useState<MultiFactorError | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
-  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  
   
   // Use useRef to hold RecaptchaVerifier to avoid re-initializing
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -122,16 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Check if email is verified before allowing MFA setup
       const freshUser = auth.currentUser;
       if (!freshUser) {
         throw new Error('User not authenticated');
-      }
-      
-      // Reload user data to get latest verification status
-      await reload(freshUser);
-      if (!freshUser.emailVerified) {
-        throw new Error('Please verify your email address before setting up multi-factor authentication');
       }
 
       const multiFactorSession = await multiFactor(freshUser).getSession();
@@ -203,37 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMfaResolver(null);
   }, []);
 
-  const sendEmailVerification = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No user is currently signed in');
-    }
-    
-    if (user.emailVerified) {
-      throw new Error('Email is already verified');
-    }
-
-    if (emailVerificationSent) {
-      throw new Error('Verification email has already been sent. Please check your email.');
-    }
-
-    await sendEmailVerification(user);
-    setEmailVerificationSent(true);
-  }, [emailVerificationSent]);
-
-  const checkEmailVerification = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No user is currently signed in');
-    }
-
-    // Force refresh the user to get latest verification status
-    await reload(user);
-    
-    if (!user.emailVerified) {
-      throw new Error('Email is not yet verified. Please check your email and click the verification link.');
-    }
-  }, []);
+  
 
   // Separate admin check function that doesn't create dependencies
   const checkAdminStatus = useCallback(async (user: User) => {
@@ -282,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Separate useEffect for admin status check
   useEffect(() => {
-    if (currentUser?.emailVerified) {
+    if (currentUser) {
       checkAdminStatus(currentUser);
     } else {
       setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
@@ -302,10 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     verifyMFASetup,
     resolveMFA,
     setupRecaptcha,
-    clearMfaError,
-    sendEmailVerification,
-    checkEmailVerification,
-    emailVerificationSent
+    clearMfaError
   };
 
   return (
