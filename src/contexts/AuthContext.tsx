@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { 
   User, 
   signInWithEmailAndPassword, 
@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const checkAdminStatus = async (user: User | null) => {
+  const checkAdminStatus = useCallback(async (user: User | null) => {
     if (!user) {
       setIsAdmin(false);
       return;
@@ -215,24 +215,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Set admin to false but don't prevent app from working
       setIsAdmin(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Only update state if the user actually changed
-      setCurrentUser(prevUser => {
-        if (prevUser?.uid !== user?.uid) {
-          return user;
-        }
-        return prevUser;
-      });
-      
+      setCurrentUser(user);
       await checkAdminStatus(user);
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [checkAdminStatus]);
 
   const value = {
     currentUser,
