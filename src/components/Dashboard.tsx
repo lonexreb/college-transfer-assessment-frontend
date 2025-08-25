@@ -31,6 +31,22 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isPending } = useAuth();
 
+  // Check if user has admin privileges
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Alert>
+            <Shield className="h-4 w-4" />
+            <AlertDescription>
+              You need admin privileges to access this application.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
   const handleCreateAssessment = () => {
     navigate('/assessment/new');
   };
@@ -322,10 +338,7 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <Button
-                onClick={handleCreateAssessment}
-                disabled={isPending && !isAdmin}
-              >
+              <Button onClick={handleCreateAssessment}>
                 <Plus className="w-4 h-4" />
                 New Comparison
               </Button>
@@ -349,7 +362,7 @@ const Dashboard = () => {
                     <p className="text-sm mb-4">
                       Get started by creating your first college comparison.
                     </p>
-                    <Button onClick={handleCreateAssessment} disabled={isPending && !isAdmin}>
+                    <Button onClick={handleCreateAssessment}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Comparison
                     </Button>
@@ -389,7 +402,6 @@ const Dashboard = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewComparison(comparison)}
-                            disabled={isPending && !isAdmin}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
