@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { currentUser, loading, isPending, isAdmin } = useAuth();
+  const { currentUser, loading, isPending, isAdmin, logout } = useAuth();
 
   if (loading) {
     return (
@@ -34,12 +34,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         <div className="container mx-auto px-4 py-8 max-w-2xl">
           <Alert>
             <Clock className="h-4 w-4" />
-            <AlertDescription className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Your account is pending approval from an administrator. Please wait for approval before accessing the application.
-              {!currentUser.emailVerified && (
-                <span className="text-amber-600 block mt-2">Please also verify your email address.</span>
-              )}
+            <AlertDescription>
+              <div className="flex items-start gap-2 mb-4">
+                <Mail className="h-4 w-4 mt-0.5" />
+                <div>
+                  Your account is pending approval from an administrator. Please wait for approval before accessing the application.
+                  {!currentUser.emailVerified && (
+                    <span className="text-amber-600 block mt-2">Please also verify your email address.</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">
+                  Signed in as: {currentUser.email}
+                </span>
+                <button
+                  onClick={() => logout()}
+                  className="text-sm text-muted-foreground hover:text-foreground underline"
+                >
+                  Logout
+                </button>
+              </div>
             </AlertDescription>
           </Alert>
         </div>
