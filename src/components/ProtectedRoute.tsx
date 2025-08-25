@@ -27,8 +27,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <AuthPage />;
   }
 
-  // If user is pending approval, show pending message WITHOUT app access
-  if (isPending && !isAdmin) {
+  // If user is authenticated but not an admin (either pending or just not approved)
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -38,9 +38,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
               <div className="flex items-start gap-2 mb-4">
                 <Mail className="h-4 w-4 mt-0.5" />
                 <div>
-                  Your account is pending approval from an administrator. Please wait for approval before accessing the application.
-                  {!currentUser.emailVerified && (
-                    <span className="text-amber-600 block mt-2">Please also verify your email address.</span>
+                  {isPending ? (
+                    <>
+                      Your account is pending approval from an administrator. Please wait for approval before accessing the application.
+                      {!currentUser.emailVerified && (
+                        <span className="text-amber-600 block mt-2">Please also verify your email address.</span>
+                      )}
+                    </>
+                  ) : (
+                    "You need admin privileges to access this application. Please contact an administrator for access."
                   )}
                 </div>
               </div>
@@ -62,8 +68,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  // User is authenticated and approved, show the protected content
-  return <>{children}</>;
+  // User is authenticated and has admin privileges, show the protected content
+  return <>{children};
 };
 
 export default ProtectedRoute;
