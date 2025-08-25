@@ -86,13 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const multiFactorSession = await multiFactor(currentUser).getSession();
-    const phoneAuthCredential = PhoneAuthProvider.credential(phoneNumber);
     const phoneInfoOptions = {
       phoneNumber,
       session: multiFactorSession
     };
 
-    return await PhoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifier);
+    const phoneAuthProvider = new PhoneAuthProvider(auth);
+    return await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifier);
   }
 
   async function verifyMFASetup(verificationCode: string, confirmationResult: ConfirmationResult) {
@@ -107,14 +107,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resolveMFA(verificationCode: string) {
-    if (!mfaResolver) {
-      throw new Error('No MFA resolver available');
+    if (!mfaResolver || !recaptchaVerifier) {
+      throw new Error('No MFA resolver available or reCAPTCHA not set up');
     }
 
-    const phoneAuthCredential = PhoneAuthProvider.credential(
-      mfaResolver.hints[0].uid,
-      verificationCode
-    );
+    const phoneInfoOptions = {
+      phoneNumber: mfaResolver.hints[0].phoneNumber,
+      session: mfaResolver.session
+    };
+
+    const phoneAuthProvider = new PhoneAuthProvider(auth);
+    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifier);
+    
+    const phoneAuthCredential = PhoneAuthProvider.credential(verificationId, verificationCode);
     const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(phoneAuthCredential);
     
     await mfaResolver.resolveSignIn(multiFactorAssertion);
