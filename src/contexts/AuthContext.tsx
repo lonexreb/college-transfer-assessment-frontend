@@ -196,14 +196,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Skip admin check if email is not verified
+    if (!user.emailVerified) {
+      setIsAdmin(false);
+      return;
+    }
+
     try {
       const token = await user.getIdToken(false);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/admin/check', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -224,21 +236,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       
       setCurrentUser(user);
+      setLoading(false);
       
-      if (user) {
-        await checkAdminStatus(user);
+      // Only check admin status after user is set and loading is done
+      if (user && user.emailVerified) {
+        // Use a small delay to ensure state is settled
+        setTimeout(() => {
+          if (mounted) {
+            checkAdminStatus(user);
+          }
+        }, 100);
       } else {
         setIsAdmin(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {
       mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [checkAdminStatus]);
 
   const value = useMemo(() => ({
     currentUser,
