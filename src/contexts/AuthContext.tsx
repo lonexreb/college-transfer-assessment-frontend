@@ -54,8 +54,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkingAdminRef = useRef(false);
 
   // Stable functions that don't depend on state
-  const signup = useCallback((email: string, password: string) => {
-    return createUserWithEmailAndPassword(auth, email, password).then(() => {});
+  const signup = useCallback(async (email: string, password: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    if (user) {
+      user.sendEmailVerification();
+    }
+    
+    return userCredential;
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
