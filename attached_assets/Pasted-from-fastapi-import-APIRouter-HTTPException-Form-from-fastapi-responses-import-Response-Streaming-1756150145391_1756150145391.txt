@@ -1,0 +1,417 @@
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import Response, StreamingResponse
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
+import uuid
+import json
+import asyncio
+import time
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for presentations")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api/v1/ppt", tags=["presentation"])
+
+# Slidespeak API configuration
+# You need to add your SlidespSpeak API key here
+# you need to add your slidespeak API key here if not then you wont be able to use this api if you try and do it without the slidespeka api key then you're going to have a big trouble doing the stuff tha tyou want to do
+SLIDESPEAK_API_KEY = "a0ef38f1-19ce-4d6f-a2b0-ae7896e36d6a"  # rElace with your actual API key
+SLIDESPEAK_BASE_URL = "https://api.slidespeak.co/api/v1"
+
+@router.post("/generate/presentation")
+async def generate_presentation_stream(
+    prompt: str = Form(...),
+    n_slides: int = Form(5),
+    language: str = Form("English"),
+    template: str = Form("general"),
+    export_as: str = Form("pptx")
+):
+    print("Generating presentation with SlidespSpeak API")
+    if not prompt:
+        raise HTTPException(status_code=400, detail='Prompt is required')
+
+    async def generate():
+        try:
+            # Step 1: Initialize
+            step_message = 'Starting presentation generation...'
+            print(f"Step 1: {step_message}")
+            yield f"data: {json.dumps({'step': 1, 'message': step_message, 'progress': 5})}\n\n"
+
+            # Step 2: Create presentation task
+            step_message = 'Creating presentation task...'
+            print(f"Step 2: {step_message}")
+            yield f"data: {json.dumps({'step': 2, 'message': step_message, 'progress': 15})}\n\n"
+
+            # Create the presentation task
+            headers = {
+                'Content-Type': 'application/json',
+                'X-API-key': SLIDESPEAK_API_KEY
+            }
+
+            create_payload = {
+                "plain_text": prompt,
+                "length": n_slides,
+                "template": template if template != "general" else "default"
+            }
+
+            response = requests.post(
+                f"{SLIDESPEAK_BASE_URL}/presentation/generate",
+                headers=headers,
+                json=create_payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            task_data = response.json()
+            task_id = task_data.get("task_id")
+
+            if not task_id:
+                raise HTTPException(status_code=500, detail="No task ID returned from API")
+
+            print(f"Created task with ID: {task_id}")
+
+            # Step 3: Poll for completion
+            step_message = 'Processing presentation...'
+            print(f"Step 3: {step_message}")
+            yield f"data: {json.dumps({'step': 3, 'message': step_message, 'progress': 25})}\n\n"
+
+            # Poll for task completion
+            max_attempts = 60  # 5 minutes with 5-second intervals
+            attempt = 0
+            presentation_url = None
+
+            while attempt < max_attempts:
+                attempt += 1
+                progress = min(25 + (attempt / max_attempts) * 60, 85)  # Progress from 25% to 85%
+
+                # Update progress message
+                if attempt < 10:
+                    message = 'Analyzing content...'
+                elif attempt < 20:
+                    message = 'Creating slide structure...'
+                elif attempt < 30:
+                    message = 'Generating slides...'
+                elif attempt < 40:
+                    message = 'Applying design...'
+                else:
+                    message = 'Finalizing presentation...'
+
+                yield f"data: {json.dumps({'step': 3, 'message': message, 'progress': int(progress)})}\n\n"
+
+                # Check task status
+                status_response = requests.get(
+                    f"{SLIDESPEAK_BASE_URL}/task_status/{task_id}",
+                    headers={'X-API-key': SLIDESPEAK_API_KEY},
+                    timeout=10
+                )
+                status_response.raise_for_status()
+                status_data = status_response.json()
+
+                task_status = status_data.get("task_status")
+
+                if task_status == "SUCCESS":
+                    task_result = status_data.get("task_result") or status_data.get("task_info")
+                    if task_result and task_result.get("url"):
+                        presentation_url = task_result["url"]
+                        break
+                elif task_status == "FAILURE":
+                    raise HTTPException(status_code=500, detail="Presentation generation failed")
+
+                await asyncio.sleep(5)  # Wait 5 seconds before next poll
+
+            if not presentation_url:
+                raise HTTPException(status_code=500, detail="Presentation generation timed out")
+
+            # Step 4: Save to Firebase
+            step_message = 'Saving presentation...'
+            print(f"Step 4: {step_message}")
+            yield f"data: {json.dumps({'step': 4, 'message': step_message, 'progress': 90})}\n\n"
+
+            presentation_id = str(uuid.uuid4())
+            static_url = f"/api/v1/ppt/view/{presentation_id}"
+
+            firebase_data = {
+                "id": presentation_id,
+                "prompt": prompt,
+                "n_slides": n_slides,
+                "language": language,
+                "template": template,
+                "export_as": export_as,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "static_url": static_url,
+                "presentation_url": presentation_url,
+                "task_id": task_id,
+                "api_provider": "slidespeak"
+            }
+
+            db.collection('presentations').document(presentation_id).set(firebase_data)
+
+            # Step 5: Complete
+            result = {
+                "presentation_id": presentation_id,
+                "firebase_id": presentation_id,
+                "path": static_url,
+                "static_url": static_url,
+                "share_link": static_url,
+                "original_prompt": prompt,
+                "n_slides": n_slides,
+                "language": language,
+                "template": template,
+                "export_as": export_as,
+                "presentation_url": presentation_url,
+                "message": "Presentation generated successfully",
+                "status": "completed"
+            }
+
+            step_message = 'Presentation ready!'
+            print(f"Step 5: {step_message}")
+            print(f"Presentation completed with ID: {presentation_id}")
+            yield f"data: {json.dumps({'step': 5, 'message': step_message, 'progress': 100, 'result': result, 'complete': True})}\n\n"
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            yield f"data: {json.dumps({'error': error_msg, 'complete': True})}\n\n"
+
+    return StreamingResponse(generate(), media_type='text/plain', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    })
+
+@router.post("/generate/presentation-sync")
+async def generate_presentation_sync(
+    prompt: str = Form(...),
+    n_slides: int = Form(5),
+    language: str = Form("English"),
+    template: str = Form("general"),
+    export_as: str = Form("pptx")
+):
+    """Non-streaming version for backward compatibility"""
+    print("Generating presentation with SlidespSpeak API (synchronous)")
+    if not prompt:
+        raise HTTPException(status_code=400, detail='Prompt is required')
+
+    try:        
+        # Create the presentation task
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-key': SLIDESPEAK_API_KEY
+        }
+
+        create_payload = {
+            "plain_text": prompt,
+            "length": n_slides,
+            "template": template if template != "general" else "default"
+        }
+
+        response = requests.post(
+            f"{SLIDESPEAK_BASE_URL}/presentation/generate",
+            headers=headers,
+            json=create_payload,
+            timeout=30
+        )
+        response.raise_for_status()
+        task_data = response.json()
+        task_id = task_data.get("task_id")
+
+        if not task_id:
+            raise HTTPException(status_code=500, detail="No task ID returned from API")
+
+        # Poll for task completion
+        max_attempts = 60  # 5 minutes with 5-second intervals
+        attempt = 0
+        presentation_url = None
+
+        while attempt < max_attempts:
+            attempt += 1
+
+            # Check task status
+            status_response = requests.get(
+                f"{SLIDESPEAK_BASE_URL}/task_status/{task_id}",
+                headers={'X-API-key': SLIDESPEAK_API_KEY},
+                timeout=10
+            )
+            status_response.raise_for_status()
+            status_data = status_response.json()
+
+            task_status = status_data.get("task_status")
+
+            if task_status == "SUCCESS":
+                task_result = status_data.get("task_result") or status_data.get("task_info")
+                if task_result and task_result.get("url"):
+                    presentation_url = task_result["url"]
+                    break
+            elif task_status == "FAILURE":
+                raise HTTPException(status_code=500, detail="Presentation generation failed")
+
+            time.sleep(5)  # Wait 5 seconds before next poll
+
+        if not presentation_url:
+            raise HTTPException(status_code=500, detail="Presentation generation timed out")
+
+        # Generate unique presentation ID and save
+        presentation_id = str(uuid.uuid4())
+        static_url = f"/api/v1/ppt/view/{presentation_id}"
+
+        firebase_data = {
+            "id": presentation_id,
+            "prompt": prompt,
+            "n_slides": n_slides,
+            "language": language,
+            "template": template,
+            "export_as": export_as,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "static_url": static_url,
+            "presentation_url": presentation_url,
+            "task_id": task_id,
+            "api_provider": "slidespeak"
+        }
+
+        db.collection('presentations').document(presentation_id).set(firebase_data)
+        print(f"Presentation saved to Firebase with ID: {presentation_id}")
+
+        return {
+            "firebase_id": presentation_id,
+            "static_url": static_url,
+            "share_link": static_url,
+            "original_prompt": prompt,
+            "n_slides": n_slides,
+            "language": language,
+            "template": template,
+            "export_as": export_as,
+            "presentation_url": presentation_url,
+            "message": "Presentation generated successfully"
+        }
+
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f'SlidespSpeak API request failed: {str(e)}')
+
+@router.get("/list/presentations")
+async def list_presentations():
+    """List all presentation links from Firebase"""
+    print("Fetching presentation list from Firebase")
+
+    try:
+        presentations_ref = db.collection('presentations')
+        docs = presentations_ref.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+
+        presentations = []
+        for doc in docs:
+            presentation_data = doc.to_dict()
+            # Convert Firestore timestamp to ISO format
+            if 'created_at' in presentation_data and presentation_data['created_at']:
+                presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+
+            # Ensure static_url is present (for backwards compatibility)
+            if 'static_url' not in presentation_data:
+                presentation_data['static_url'] = f"/api/v1/ppt/view/{presentation_data.get('id', doc.id)}"
+
+            presentations.append(presentation_data)
+
+        return {"presentations": presentations}
+
+    except Exception as e:
+        print(f"Error fetching presentations from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentations: {str(e)}')
+
+@router.get("/presentation/{presentation_id}")
+async def get_presentation(presentation_id: str):
+    """Get a specific presentation by ID from Firebase"""
+    print(f"Fetching presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        presentation_data = doc.to_dict()
+        # Convert Firestore timestamp to ISO format
+        if 'created_at' in presentation_data and presentation_data['created_at']:
+            presentation_data['created_at'] = presentation_data['created_at'].isoformat()
+
+        return presentation_data
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error fetching presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentation: {str(e)}')
+
+@router.get("/view/{presentation_id}")
+async def view_presentation(presentation_id: str):
+    print(f"Serving presentation {presentation_id}")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        presentation_data = doc.to_dict()
+        print(f"Presentation data: {presentation_data}")
+
+        # Get the presentation URL
+        presentation_url = presentation_data.get("presentation_url")
+        if not presentation_url:
+            raise HTTPException(status_code=404, detail='Presentation file not found')
+
+        print(f"Fetching file from: {presentation_url}")
+
+        # Fetch the file content from SlidespSpeak
+        file_response = requests.get(presentation_url, timeout=30)
+        file_response.raise_for_status()
+
+        # Return the file content directly with proper headers
+        return Response(
+            content=file_response.content,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={
+                "Content-Disposition": f"attachment; filename=presentation_{presentation_id}.pptx",
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except requests.RequestException as e:
+        print(f"Error fetching presentation content: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to fetch presentation content: {str(e)}')
+    except Exception as e:
+        print(f"Error serving presentation: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to serve presentation: {str(e)}')
+
+@router.delete("/presentation/{presentation_id}")
+async def delete_presentation(presentation_id: str):
+    """Delete a specific presentation by ID from Firebase"""
+    print(f"Deleting presentation {presentation_id} from Firebase")
+
+    try:
+        doc_ref = db.collection('presentations').document(presentation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail='Presentation not found')
+
+        doc_ref.delete()
+        return {"message": "Presentation deleted successfully", "id": presentation_id}
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error deleting presentation from Firebase: {e}")
+        raise HTTPException(status_code=500, detail=f'Failed to delete presentation: {str(e)}')
