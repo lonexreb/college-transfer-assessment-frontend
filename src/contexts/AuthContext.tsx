@@ -180,11 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user is currently signed in');
     }
 
-    // Only reload if we need fresh verification status
     await reload(freshUser);
-    
-    // Update the current user state with fresh verification status
-    setCurrentUser({ ...freshUser });
     
     if (!freshUser.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
@@ -198,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const token = await user.getIdToken(false); // Don't force refresh to avoid loops
+      const token = await user.getIdToken(false);
       const response = await fetch('https://degree-works-backend-hydrabeans.replit.app/api/admin/check', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -210,25 +206,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         setIsAdmin(data.isAdmin || false);
       } else {
-        console.log('Admin check failed:', response.status);
         setIsAdmin(false);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
-      // Set admin to false but don't prevent app from working
       setIsAdmin(false);
     }
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!mounted) return;
+      
       setCurrentUser(user);
-      await checkAdminStatus(user);
+      
+      if (user) {
+        await checkAdminStatus(user);
+      } else {
+        setIsAdmin(false);
+      }
+      
       setLoading(false);
     });
 
-    return unsubscribe;
-  }, [checkAdminStatus]);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   const value = {
     currentUser,
