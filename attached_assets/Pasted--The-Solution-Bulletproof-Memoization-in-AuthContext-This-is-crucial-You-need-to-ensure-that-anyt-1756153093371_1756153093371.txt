@@ -1,0 +1,148 @@
+ The Solution: Bulletproof Memoization in AuthContext
+
+This is crucial. You need to ensure that anything you pass down from your AuthContext that's used as a dependency in a child component's useEffect or useCallback is stable across renders .
+
+In your AuthContext.tsx (or wherever your AuthProvider is defined):
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+
+import { getAuth, onAuthStateChanged, User, RecaptchaVerifier, sendEmailVerification as firebaseSendEmailVerification, ... } from 'firebase/auth';
+
+
+// ... (your AuthContext setup)
+
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const auth = getAuth();
+
+  // Using useRef to hold RecaptchaVerifier to avoid re-initializing
+
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
+
+  useEffect(() => {
+
+    const unsubscribe = onAuthStateChanged(auth, user => {
+
+      setCurrentUser(user);
+
+    });
+
+    return unsubscribe;
+
+  }, [auth]);
+
+
+  // Memoize setupRecaptcha
+
+  const setupRecaptcha = useCallback((containerId: string) => {
+
+    // Only initialize if it doesn't exist
+
+    if (!recaptchaVerifierRef.current) {
+
+      recaptchaVerifierRef.current = new RecaptchaVerifier(containerId, {
+
+        size: 'invisible',
+
+        callback: (response: any) => { /* ... */ },
+
+        'expired-callback': () => {
+
+          recaptchaVerifierRef.current?.clear();
+
+          recaptchaVerifierRef.current = null; // Allow re-initialization if expired
+
+        }
+
+      }, auth);
+
+    }
+
+  }, [auth]); // Depends only on 'auth' which is stable
+
+
+  // Memoize sendEmailVerification
+
+  const sendEmailVerification = useCallback(async () => {
+
+    if (currentUser) {
+
+      await firebaseSendEmailVerification(currentUser);
+
+      // Force a reload to update emailVerified status immediately
+
+      await currentUser.reload();
+
+      // Important: Ensure currentUser state is updated from the *reloaded* user
+
+      setCurrentUser(auth.currentUser);
+
+    }
+
+  }, [currentUser, auth]); // Depends on currentUser (which Firebase manages) and auth
+
+
+  // Memoize checkEmailVerification
+
+  const checkEmailVerification = useCallback(async () => {
+
+    if (currentUser) {
+
+      await currentUser.reload(); // Re-fetch the latest user data from Firebase
+
+      // Important: Ensure currentUser state is updated from the *reloaded* user
+
+      setCurrentUser(auth.currentUser);
+
+      if (!auth.currentUser?.emailVerified) {
+
+        throw new Error('Email not yet verified. Please check your inbox.');
+
+      }
+
+    }
+
+  }, [currentUser, auth]); // Depends on currentUser and auth
+
+
+  // Make sure the `value` object itself is memoized!
+
+  const value = useMemo(() => ({
+
+    currentUser,
+
+    setupRecaptcha, // Memoized function
+
+    sendEmailVerification, // Memoized function
+
+    checkEmailVerification, // Memoized function
+
+    // ... all other functions and values you expose
+
+  }), [currentUser, setupRecaptcha, sendEmailVerification, checkEmailVerification /* ... other memoized deps */]);
+
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+}
+
+By ensuring all functions ( setupRecaptcha , sendEmailVerification , checkEmailVerification ) are wrapped in useCallback and the entire value object is wrapped in useMemo , you guarantee that their references remain the same across renders unless their own specific dependencies change. This breaks the recursive loop that's likely triggering your useEffect in MFASetup over and over.
+
+Next Steps to Debug:
+
+    Implement the memoization in AuthContext first. This is the most likely fix.
+
+    If the error persists, open your browser's developer tools (usually F12). When the "too much recursion" error appears in the console, click on it. This will show you the call stack . Look for a repeating pattern of function calls – this will pinpoint the exact loop.
+
+    Place debugger; statements or breakpoints in your useEffect in MFASetup , and inside the AuthProvider 's render, specifically where you define the value prop for the context. Observe if the value object or its contained functions are getting new references on successive renders. 
+
+To help you specifically with debugging:
+
+    Could you explain how I can interpret the call stack shown in browser developer tools to pinpoint the recursive loop?
+
+    What are common pitfalls to avoid when using useEffect with context values to prevent infinite loops?
+
+    How can I temporarily disable parts of my code to isolate the exact section causing the recursion? 
