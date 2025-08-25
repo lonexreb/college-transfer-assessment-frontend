@@ -23,6 +23,7 @@ import { auth } from '@/lib/firebase';
 interface AuthContextType {
   currentUser: User | null;
   isAdmin: boolean;
+  isPending: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -44,6 +45,7 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mfaError, setMfaError] = useState<MultiFactorError | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
@@ -238,13 +240,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         // Only update state if it actually changes to prevent unnecessary re-renders
         const adminStatus = data.isAdmin || false;
+        const pendingStatus = data.isPending || false;
+        
         setIsAdmin(prevIsAdmin => prevIsAdmin !== adminStatus ? adminStatus : prevIsAdmin);
+        setIsPending(prevIsPending => prevIsPending !== pendingStatus ? pendingStatus : prevIsPending);
       } else {
         setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
+        setIsPending(prevIsPending => prevIsPending !== true ? true : prevIsPending);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
       setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
+      setIsPending(prevIsPending => prevIsPending !== true ? true : prevIsPending);
     } finally {
       checkingAdminRef.current = false;
     }
@@ -265,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       checkAdminStatus(currentUser);
     } else {
       setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
+      setIsPending(prevIsPending => prevIsPending !== false ? false : prevIsPending);
     }
   }, [currentUser, checkAdminStatus]);
 
@@ -272,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     currentUser,
     isAdmin,
+    isPending,
     login,
     signup,
     logout,

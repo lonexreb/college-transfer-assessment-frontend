@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, BarChart3, Shield } from "lucide-react";
+import { CalendarDays, Users, FileText, TrendingUp, Plus, Eye, LogOut, User, BarChart3, Shield, Clock } from "lucide-react";
 import { mockAssessments } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import AdminManager from "@/components/AdminManager";
@@ -12,6 +12,8 @@ import PresentationManager from "@/components/PresentationManager";
 import PromptManager from "./PromptManager";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
 
 interface Comparison {
   id: string;
@@ -26,8 +28,8 @@ interface Comparison {
 }
 
 const Dashboard = () => {
-  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { currentUser, logout, isAdmin, isPending } = useAuth();
 
   const handleCreateAssessment = () => {
     navigate('/assessment/new');
@@ -254,56 +256,65 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
+            {isPending && !isAdmin && (
+              <Alert className="mb-6">
+                <Clock className="h-4 w-4" />
+                <AlertDescription>
+                  Your account is pending approval. You have limited access until an administrator approves your account.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
+              <Card className={isPending && !isAdmin ? "opacity-50" : ""}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Comparisons</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{comparisons.length}</div>
+                  <div className="text-2xl font-bold">{isPending && !isAdmin ? "—" : comparisons.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    Saved college comparisons
+                    {isPending && !isAdmin ? "Pending approval" : "Saved college comparisons"}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={isPending && !isAdmin ? "opacity-50" : ""}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Unique Institutions</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalInstitutions}</div>
+                  <div className="text-2xl font-bold">{isPending && !isAdmin ? "—" : totalInstitutions}</div>
                   <p className="text-xs text-muted-foreground">
-                    Different schools compared
+                    {isPending && !isAdmin ? "Pending approval" : "Different schools compared"}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={isPending && !isAdmin ? "opacity-50" : ""}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Presentations</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{presentationCount}</div>
+                  <div className="text-2xl font-bold">{isPending && !isAdmin ? "—" : presentationCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    Generated presentations
+                    {isPending && !isAdmin ? "Pending approval" : "Generated presentations"}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={isPending && !isAdmin ? "opacity-50" : ""}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">This Week</CardTitle>
                   <CalendarDays className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{weeklyComparisons}</div>
+                  <div className="text-2xl font-bold">{isPending && !isAdmin ? "—" : weeklyComparisons}</div>
                   <p className="text-xs text-muted-foreground">
-                    New comparisons created
+                    {isPending && !isAdmin ? "Pending approval" : "New comparisons created"}
                   </p>
                 </CardContent>
               </Card>
@@ -311,7 +322,10 @@ const Dashboard = () => {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <Button onClick={handleCreateAssessment} className="flex items-center gap-2">
+              <Button
+                onClick={handleCreateAssessment}
+                disabled={isPending && !isAdmin}
+              >
                 <Plus className="w-4 h-4" />
                 New Comparison
               </Button>
@@ -335,7 +349,7 @@ const Dashboard = () => {
                     <p className="text-sm mb-4">
                       Get started by creating your first college comparison.
                     </p>
-                    <Button onClick={handleCreateAssessment}>
+                    <Button onClick={handleCreateAssessment} disabled={isPending && !isAdmin}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Comparison
                     </Button>
@@ -375,6 +389,7 @@ const Dashboard = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewComparison(comparison)}
+                            disabled={isPending && !isAdmin}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View

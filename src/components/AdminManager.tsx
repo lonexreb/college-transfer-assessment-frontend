@@ -13,9 +13,17 @@ interface AdminUser {
   addedBy: string;
 }
 
+interface PendingUser {
+  email: string;
+  uid: string;
+  signupDate: string;
+  emailVerified: boolean;
+}
+
 const AdminManager = () => {
   const { currentUser, isAdmin } = useAuth();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -48,9 +56,33 @@ const AdminManager = () => {
     }
   };
 
+  const fetchPendingUsers = async () => {
+    if (!isAdmin || !currentUser) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/pending`, {
+        headers: {
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending users');
+      }
+
+      const data = await response.json();
+      setPendingUsers(data.pendingUsers || []);
+    } catch (error) {
+      console.error('Error fetching pending users:', error);
+      setMessage({ type: 'error', text: 'Failed to fetch pending users' });
+    }
+  };
+
   useEffect(() => {
     if (isAdmin && currentUser) {
       fetchAdmins();
+      fetchPendingUsers();
     }
   }, [isAdmin, currentUser]);
 
@@ -78,8 +110,71 @@ const AdminManager = () => {
       setMessage({ type: 'success', text: 'Admin added successfully' });
       setNewAdminEmail('');
       await fetchAdmins();
+      await fetchPendingUsers();
     } catch (error) {
       console.error('Error adding admin:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveUser = async (email: string) => {
+    if (!currentUser) return;
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+
+      const response = await fetch(`${API_BASE}/api/admin/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to approve user');
+      }
+
+      setMessage({ type: 'success', text: 'User approved successfully' });
+      await fetchPendingUsers();
+    } catch (error) {
+      console.error('Error approving user:', error);
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectUser = async (email: string) => {
+    if (!currentUser) return;
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('email', email);
+
+      const response = await fetch(`${API_BASE}/api/admin/reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to reject user');
+      }
+
+      setMessage({ type: 'success', text: 'User rejected successfully' });
+      await fetchPendingUsers();
+    } catch (error) {
+      console.error('Error rejecting user:', error);
       setMessage({ type: 'error', text: error.message });
     } finally {
       setLoading(false);
@@ -109,6 +204,7 @@ const AdminManager = () => {
 
       setMessage({ type: 'success', text: 'Admin removed successfully' });
       await fetchAdmins();
+      await fetchPendingUsers();
     } catch (error) {
       console.error('Error removing admin:', error);
       setMessage({ type: 'error', text: error.message });
@@ -160,7 +256,10 @@ const AdminManager = () => {
               Add Admin
             </Button>
             <Button 
-              onClick={fetchAdmins} 
+              onClick={() => {
+                fetchAdmins();
+                fetchPendingUsers();
+              }} 
               disabled={loading}
               variant="outline"
               size="sm"
@@ -170,41 +269,91 @@ const AdminManager = () => {
             </Button>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Admin Users</h3>
-            {admins.length === 0 ? (
-              <p className="text-muted-foreground">No admin users found</p>
-            ) : (
-              <div className="space-y-2">
-                {admins.map((admin) => (
-                  <div 
-                    key={admin.email} 
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div>
-                      <div className="font-medium">{admin.email}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Added on {new Date(admin.addedAt).toLocaleDateString()} by {admin.addedBy}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Pending User Approvals</h3>
+              {pendingUsers.length === 0 ? (
+                <p className="text-muted-foreground">No pending users</p>
+              ) : (
+                <div className="space-y-2">
+                  {pendingUsers.map((user) => (
+                    <div 
+                      key={user.email} 
+                      className="flex items-center justify-between p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20"
+                    >
+                      <div>
+                        <div className="font-medium">{user.email}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Signed up on {new Date(user.signupDate).toLocaleDateString()}
+                          {user.emailVerified ? 
+                            <span className="text-green-600 ml-2">✓ Email verified</span> : 
+                            <span className="text-amber-600 ml-2">⚠ Email not verified</span>
+                          }
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default">Admin</Badge>
-                      {admin.email !== currentUser?.email && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Pending</Badge>
                         <Button
-                          onClick={() => handleRemoveAdmin(admin.email)}
+                          onClick={() => handleApproveUser(user.email)}
+                          disabled={loading}
+                          variant="default"
+                          size="sm"
+                        >
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => handleRejectUser(user.email)}
                           disabled={loading}
                           variant="destructive"
                           size="sm"
                         >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Remove
+                          <UserMinus className="w-4 h-4 mr-1" />
+                          Reject
                         </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Admin Users</h3>
+              {admins.length === 0 ? (
+                <p className="text-muted-foreground">No admin users found</p>
+              ) : (
+                <div className="space-y-2">
+                  {admins.map((admin) => (
+                    <div 
+                      key={admin.email} 
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div>
+                        <div className="font-medium">{admin.email}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Added on {new Date(admin.addedAt).toLocaleDateString()} by {admin.addedBy}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default">Admin</Badge>
+                        {admin.email !== currentUser?.email && (
+                          <Button
+                            onClick={() => handleRemoveAdmin(admin.email)}
+                            disabled={loading}
+                            variant="destructive"
+                            size="sm"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
