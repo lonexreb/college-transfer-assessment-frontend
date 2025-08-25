@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   User, 
   signInWithEmailAndPassword, 
@@ -51,11 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
 
-  function signup(email: string, password: string) {
+  const signup = useCallback((email: string, password: string) => {
     return createUserWithEmailAndPassword(auth, email, password).then(() => {});
-  }
+  }, []);
 
-  async function login(email: string, password: string) {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
@@ -66,31 +66,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error;
     }
-  }
+  }, []);
 
-  function logout() {
+  const logout = useCallback(() => {
     return signOut(auth);
-  }
+  }, []);
 
-  function setupRecaptcha(elementId: string) {
+  const setupRecaptcha = useCallback((elementId: string) => {
     if (!recaptchaVerifier) {
       const verifier = new RecaptchaVerifier(auth, elementId, {
         'size': 'invisible',
         'callback': () => {
           // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          // reCAPTCHA expired
+          setRecaptchaVerifier(null);
         }
       });
       setRecaptchaVerifier(verifier);
     }
-  }
+  }, [recaptchaVerifier]);
 
-  async function setupMFA(phoneNumber: string): Promise<ConfirmationResult> {
+  const setupMFA = useCallback(async (phoneNumber: string): Promise<ConfirmationResult> => {
     if (!currentUser || !recaptchaVerifier) {
       throw new Error('User not authenticated or reCAPTCHA not set up');
     }
 
     // Check if email is verified before allowing MFA setup
-    // Use a fresh reference to avoid state mutation issues
     const freshUser = auth.currentUser;
     if (!freshUser) {
       throw new Error('User not authenticated');
@@ -123,17 +126,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { user: currentUser };
       }
     } as ConfirmationResult;
-  }
+  }, [currentUser, recaptchaVerifier]);
 
-  async function verifyMFASetup(verificationCode: string, confirmationResult: ConfirmationResult) {
+  const verifyMFASetup = useCallback(async (verificationCode: string, confirmationResult: ConfirmationResult) => {
     if (!currentUser) {
       throw new Error('User not authenticated');
     }
 
     await confirmationResult.confirm(verificationCode);
-  }
+  }, [currentUser]);
 
-  async function resolveMFA(verificationCode: string) {
+  const resolveMFA = useCallback(async (verificationCode: string) => {
     if (!mfaResolver || !recaptchaVerifier) {
       throw new Error('No MFA resolver available or reCAPTCHA not set up');
     }
@@ -155,14 +158,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await mfaResolver.resolveSignIn(multiFactorAssertion);
     setMfaError(null);
     setMfaResolver(null);
-  }
+  }, [mfaResolver, recaptchaVerifier]);
 
-  function clearMfaError() {
+  const clearMfaError = useCallback(() => {
     setMfaError(null);
     setMfaResolver(null);
-  }
+  }, []);
 
-  async function sendEmailVerification() {
+  const sendEmailVerification = useCallback(async () => {
     if (!currentUser) {
       throw new Error('No user is currently signed in');
     }
@@ -172,9 +175,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await sendEmailVerification(currentUser);
-  }
+  }, [currentUser]);
 
-  async function checkEmailVerification() {
+  const checkEmailVerification = useCallback(async () => {
     const freshUser = auth.currentUser;
     if (!freshUser) {
       throw new Error('No user is currently signed in');
@@ -185,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!freshUser.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
-  }
+  }, []);
 
   const checkAdminStatus = useCallback(async (user: User | null) => {
     if (!user) {
@@ -237,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     currentUser,
     isAdmin,
     login,
@@ -252,7 +255,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearMfaError,
     sendEmailVerification,
     checkEmailVerification
-  };
+  }), [
+    currentUser,
+    isAdmin,
+    login,
+    signup,
+    logout,
+    loading,
+    mfaError,
+    setupMFA,
+    verifyMFASetup,
+    resolveMFA,
+    setupRecaptcha,
+    clearMfaError,
+    sendEmailVerification,
+    checkEmailVerification
+  ]);
 
   return (
     <AuthContext.Provider value={value}>
