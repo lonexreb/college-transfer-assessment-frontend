@@ -272,27 +272,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!mounted) return;
 
       setCurrentUser(user);
       setLoading(false);
-
-      // Handle admin status check - only for verified users
-      if (user?.emailVerified) {
-        checkAdminStatus(user);
-      } else {
-        setIsAdmin(false);
-      }
     });
 
     return () => {
       mounted = false;
       unsubscribe();
-      checkingAdminRef.current = false;
     };
-  }, []); // <-- you intentionally removed checkAdminStatus
- // Remove checkAdminStatus from dependencies to prevent recursion
+  }, []);
+
+  // Separate useEffect for admin status check
+  useEffect(() => {
+    if (currentUser?.emailVerified) {
+      checkAdminStatus(currentUser);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [currentUser?.emailVerified, currentUser?.uid, checkAdminStatus]);
 
   const value = useMemo(() => ({
     currentUser,
