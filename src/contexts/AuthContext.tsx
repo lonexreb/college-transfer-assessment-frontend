@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { 
   User, 
   signInWithEmailAndPassword, 
@@ -48,12 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mfaError, setMfaError] = useState<MultiFactorError | null>(null);
-  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
+  
+  // Use useRef to hold RecaptchaVerifier to avoid re-initializing
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const signup = useCallback((email: string, password: string) => {
     return createUserWithEmailAndPassword(auth, email, password).then(() => {});
-  }, []);
+  }, []); // No dependencies - auth is stable
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -66,30 +68,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error;
     }
-  }, []);
+  }, []); // No dependencies - auth is stable
 
   const logout = useCallback(() => {
     return signOut(auth);
-  }, []);
+  }, []); // No dependencies - auth is stable
 
   const setupRecaptcha = useCallback((elementId: string) => {
-    if (!recaptchaVerifier) {
-      const verifier = new RecaptchaVerifier(auth, elementId, {
+    // Only initialize if it doesn't exist
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, elementId, {
         'size': 'invisible',
         'callback': () => {
           // reCAPTCHA solved
         },
         'expired-callback': () => {
-          // reCAPTCHA expired
-          setRecaptchaVerifier(null);
+          // reCAPTCHA expired - clear and allow re-initialization
+          recaptchaVerifierRef.current?.clear();
+          recaptchaVerifierRef.current = null;
         }
       });
-      setRecaptchaVerifier(verifier);
     }
-  }, [recaptchaVerifier]);
+  }, []); // No dependencies - auth is stable, elementId changes don't require re-creation
 
   const setupMFA = useCallback(async (phoneNumber: string): Promise<ConfirmationResult> => {
-    if (!currentUser || !recaptchaVerifier) {
+    if (!currentUser || !recaptchaVerifierRef.current) {
       throw new Error('User not authenticated or reCAPTCHA not set up');
     }
 
@@ -114,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const phoneAuthProvider = new PhoneAuthProvider(auth);
-    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifier);
+    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifierRef.current);
     
     // Return a ConfirmationResult-like object for compatibility
     return {
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { user: currentUser };
       }
     } as ConfirmationResult;
-  }, [currentUser, recaptchaVerifier]);
+  }, [currentUser]); // Only depend on currentUser, not recaptchaVerifier
 
   const verifyMFASetup = useCallback(async (verificationCode: string, confirmationResult: ConfirmationResult) => {
     if (!currentUser) {
@@ -137,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser]);
 
   const resolveMFA = useCallback(async (verificationCode: string) => {
-    if (!mfaResolver || !recaptchaVerifier) {
+    if (!mfaResolver || !recaptchaVerifierRef.current) {
       throw new Error('No MFA resolver available or reCAPTCHA not set up');
     }
 
@@ -150,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const phoneAuthProvider = new PhoneAuthProvider(auth);
-    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifier);
+    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifierRef.current);
     
     const phoneAuthCredential = PhoneAuthProvider.credential(verificationId, verificationCode);
     const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(phoneAuthCredential);
@@ -158,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await mfaResolver.resolveSignIn(multiFactorAssertion);
     setMfaError(null);
     setMfaResolver(null);
-  }, [mfaResolver, recaptchaVerifier]);
+  }, [mfaResolver]); // Only depend on mfaResolver, not recaptchaVerifier
 
   const clearMfaError = useCallback(() => {
     setMfaError(null);
@@ -175,24 +178,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await sendEmailVerification(currentUser);
-  }, [currentUser]);
+    // Force a reload to update emailVerified status immediately
+    await currentUser.reload();
+    // Update currentUser state with reloaded user
+    setCurrentUser(auth.currentUser);
+  }, [currentUser]); // Depends on currentUser which is managed by Firebase
 
   const checkEmailVerification = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user) {
+    if (currentUser) {
+      await currentUser.reload(); // Re-fetch the latest user data from Firebase
+      // Update currentUser state with reloaded user
+      setCurrentUser(auth.currentUser);
+      
+      if (!auth.currentUser?.emailVerified) {
+        throw new Error('Email is not yet verified. Please check your email and click the verification link.');
+      }
+    } else {
       throw new Error('No user is currently signed in');
     }
-
-    // Force refresh the user to get latest verification status
-    await reload(user);
-    
-    if (!user.emailVerified) {
-      throw new Error('Email is not yet verified. Please check your email and click the verification link.');
-    }
-
-    // User is now verified, trigger auth state update
-    // This will cause the auth listener to run and check admin status
-  }, []);
+  }, [currentUser]); // Depends on currentUser
 
   const checkAdminStatus = useCallback(async (user: User | null) => {
     if (!user) {
