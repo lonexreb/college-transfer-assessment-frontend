@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = userCredential.user;
     
     if (user) {
-      user.sendEmailVerification();
+      await user.sendEmailVerification();
+      console.log('Email verification sent to:', user.email);
     }
     
     return userCredential;
