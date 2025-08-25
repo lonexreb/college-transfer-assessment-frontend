@@ -32,11 +32,21 @@ const MFASetup = () => {
       setError('');
       setLoading(true);
       
-      const result = await setupMFA(phoneNumber);
+      // Ensure phone number has proper format
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+1${phoneNumber}`;
+      
+      const result = await setupMFA(formattedPhone);
       setConfirmationResult(result);
       setStep('verify');
     } catch (error: any) {
-      setError(error.message || 'Failed to send verification code');
+      console.error('MFA setup error:', error);
+      if (error.message.includes('email address')) {
+        setError('Please verify your email address before setting up MFA');
+      } else if (error.message.includes('reCAPTCHA')) {
+        setError('Please complete the reCAPTCHA verification');
+      } else {
+        setError(error.message || 'Failed to send verification code');
+      }
     } finally {
       setLoading(false);
     }
@@ -45,7 +55,10 @@ const MFASetup = () => {
   async function handleVerifySubmit(e: React.FormEvent) {
     e.preventDefault();
     
-    if (!confirmationResult) return;
+    if (!confirmationResult) {
+      setError('No verification in progress');
+      return;
+    }
     
     try {
       setError('');
@@ -54,7 +67,14 @@ const MFASetup = () => {
       await verifyMFASetup(verificationCode, confirmationResult);
       setSuccess(true);
     } catch (error: any) {
-      setError(error.message || 'Invalid verification code');
+      console.error('MFA verification error:', error);
+      if (error.message.includes('invalid-verification-code')) {
+        setError('Invalid verification code. Please try again.');
+      } else if (error.message.includes('code-expired')) {
+        setError('Verification code has expired. Please request a new one.');
+      } else {
+        setError(error.message || 'Invalid verification code');
+      }
     } finally {
       setLoading(false);
     }

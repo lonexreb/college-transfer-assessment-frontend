@@ -75,60 +75,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // No dependencies - auth is stable
 
   const setupRecaptcha = useCallback((elementId: string) => {
-    // Only initialize if it doesn't exist
-    if (!recaptchaVerifierRef.current) {
+    try {
+      // Clear any existing reCAPTCHA first
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+
+      // Check if element exists
+      const element = document.getElementById(elementId);
+      if (!element) {
+        console.warn(`reCAPTCHA element with id "${elementId}" not found`);
+        return;
+      }
+
       recaptchaVerifierRef.current = new RecaptchaVerifier(auth, elementId, {
         'size': 'invisible',
         'callback': () => {
-          // reCAPTCHA solved
+          console.log('reCAPTCHA solved successfully');
         },
         'expired-callback': () => {
-          // reCAPTCHA expired - clear and allow re-initialization
+          console.log('reCAPTCHA expired, clearing...');
           recaptchaVerifierRef.current?.clear();
           recaptchaVerifierRef.current = null;
         }
       });
+    } catch (error) {
+      console.error('Failed to initialize reCAPTCHA:', error);
+      recaptchaVerifierRef.current = null;
     }
   }, []); // No dependencies - auth is stable, elementId changes don't require re-creation
 
   const setupMFA = useCallback(async (phoneNumber: string): Promise<ConfirmationResult> => {
-    if (!currentUser || !recaptchaVerifierRef.current) {
-      throw new Error('User not authenticated or reCAPTCHA not set up');
-    }
-
-    // Check if email is verified before allowing MFA setup
-    const freshUser = auth.currentUser;
-    if (!freshUser) {
+    if (!currentUser) {
       throw new Error('User not authenticated');
     }
-    
-    // Reload user data only if necessary
-    if (!freshUser.emailVerified) {
+
+    if (!recaptchaVerifierRef.current) {
+      throw new Error('reCAPTCHA not set up. Please refresh the page and try again.');
+    }
+
+    try {
+      // Check if email is verified before allowing MFA setup
+      const freshUser = auth.currentUser;
+      if (!freshUser) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Reload user data to get latest verification status
       await reload(freshUser);
       if (!freshUser.emailVerified) {
         throw new Error('Please verify your email address before setting up multi-factor authentication');
       }
-    }
 
-    const multiFactorSession = await multiFactor(currentUser).getSession();
-    const phoneInfoOptions = {
-      phoneNumber,
-      session: multiFactorSession
-    };
+      const multiFactorSession = await multiFactor(freshUser).getSession();
+      const phoneInfoOptions = {
+        phoneNumber,
+        session: multiFactorSession
+      };
 
-    const phoneAuthProvider = new PhoneAuthProvider(auth);
-    const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifierRef.current);
-    
-    // Return a ConfirmationResult-like object for compatibility
-    return {
-      verificationId,
-      confirm: async (verificationCode: string) => {
-        const cred = PhoneAuthProvider.credential(verificationId, verificationCode);
-        const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
-        await multiFactor(currentUser).enroll(multiFactorAssertion, 'Phone Number');
-        return { user: currentUser };
+      const phoneAuthProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneAuthProvider.verifyPhoneNumber(phoneInfoOptions, recaptchaVerifierRef.current);
+      
+      // Return a ConfirmationResult-like object for compatibility
+      return {
+        verificationId,
+        confirm: async (verificationCode: string) => {
+          const cred = PhoneAuthProvider.credential(verificationId, verificationCode);
+          const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
+          await multiFactor(freshUser).enroll(multiFactorAssertion, 'Phone Number');
+          return { user: freshUser };
+        }
+      } as ConfirmationResult;
+    } catch (error: any) {
+      console.error('MFA setup error:', error);
+      
+      // Clear reCAPTCHA on error to allow retry
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
       }
-    } as ConfirmationResult;
+      
+      throw error;
+    }
   }, [currentUser]); // Only depend on currentUser, not recaptchaVerifier
 
   const verifyMFASetup = useCallback(async (verificationCode: string, confirmationResult: ConfirmationResult) => {
