@@ -281,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       unsubscribe();
     };
-  }, [checkAdminStatus]); // Only depend on the stable memoized function
+  }, []); // Remove checkAdminStatus dependency to prevent recursion
 
   const value = useMemo(() => ({
     currentUser,
