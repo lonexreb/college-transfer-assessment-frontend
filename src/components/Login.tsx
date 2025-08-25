@@ -23,7 +23,8 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
   const [mfaCode, setMfaCode] = useState('');
   const [showMFA, setShowMFA] = useState(false);
   const [showEmailVerification, setShowEmailVerification] = useState(false);
-  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha, sendEmailVerification, checkEmailVerification } = useAuth();
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha, sendEmailVerification, checkEmailVerification, emailVerificationSent } = useAuth();
 
   useEffect(() => {
     if (mfaError) {
@@ -46,8 +47,6 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
       
       if (isSignupMode) {
         await signup(email, password);
-        // After signup, automatically send verification email
-        await sendEmailVerification();
         setShowEmailVerification(true);
       } else {
         await login(email, password);
@@ -102,6 +101,18 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
     }
   }
 
+  async function handleSendEmailVerification() {
+    try {
+      setError('');
+      setSendingEmail(true);
+      await sendEmailVerification();
+    } catch (error: any) {
+      setError(error.message || 'Failed to send verification email');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   function handleBackToSignup() {
     setShowEmailVerification(false);
     setError('');
@@ -116,7 +127,10 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
               Verify Your Email
             </CardTitle>
             <CardDescription className="text-center">
-              We've sent a verification link to {email}. Please check your email and click the link.
+              {emailVerificationSent 
+                ? `We've sent a verification link to ${email}. Please check your email and click the link.`
+                : `Please send a verification email to ${email} and then click the link in your email.`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -127,11 +141,25 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
                 </Alert>
               )}
               
-              <Alert>
-                <AlertDescription>
-                  After clicking the verification link in your email, come back here and click the button below.
-                </AlertDescription>
-              </Alert>
+              {!emailVerificationSent && (
+                <Button 
+                  type="button"
+                  onClick={handleSendEmailVerification}
+                  className="w-full mb-4"
+                  disabled={sendingEmail}
+                >
+                  {sendingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Verification Email
+                </Button>
+              )}
+              
+              {emailVerificationSent && (
+                <Alert>
+                  <AlertDescription>
+                    After clicking the verification link in your email, come back here and click the button below.
+                  </AlertDescription>
+                </Alert>
+              )}
               
               <Button 
                 type="submit" 

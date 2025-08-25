@@ -35,6 +35,7 @@ interface AuthContextType {
   clearMfaError: () => void;
   sendEmailVerification: () => Promise<void>;
   checkEmailVerification: () => Promise<void>;
+  emailVerificationSent: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mfaError, setMfaError] = useState<MultiFactorError | null>(null);
   const [mfaResolver, setMfaResolver] = useState<any>(null);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
   
   // Use useRef to hold RecaptchaVerifier to avoid re-initializing
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -211,8 +213,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Email is already verified');
     }
 
+    if (emailVerificationSent) {
+      throw new Error('Verification email has already been sent. Please check your email.');
+    }
+
     await sendEmailVerification(user);
-  }, []);
+    setEmailVerificationSent(true);
+  }, [emailVerificationSent]);
 
   const checkEmailVerification = useCallback(async () => {
     const user = auth.currentUser;
@@ -301,7 +308,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setupRecaptcha,
     clearMfaError,
     sendEmailVerification,
-    checkEmailVerification
+    checkEmailVerification,
+    emailVerificationSent
   }), [
     currentUser,
     isAdmin,
@@ -316,7 +324,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setupRecaptcha,
     clearMfaError,
     sendEmailVerification,
-    checkEmailVerification
+    checkEmailVerification,
+    emailVerificationSent
   ]);
 
   return (
