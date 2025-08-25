@@ -27,22 +27,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <AuthPage />;
   }
 
-  // If user is pending approval, show pending message with limited access
+  // If user is pending approval, show pending message WITHOUT app access
   if (isPending && !isAdmin) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <Alert className="max-w-2xl mx-auto mb-8">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Alert>
             <Clock className="h-4 w-4" />
             <AlertDescription className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
-              Your account is pending approval from an administrator. You have limited access until approved.
+              Your account is pending approval from an administrator. Please wait for approval before accessing the application.
               {!currentUser.emailVerified && (
-                <span className="text-amber-600">Please also verify your email address.</span>
+                <span className="text-amber-600 block mt-2">Please also verify your email address.</span>
               )}
             </AlertDescription>
           </Alert>
-          {children}
         </div>
       </div>
     );
