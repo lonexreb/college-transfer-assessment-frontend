@@ -31,21 +31,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isPending } = useAuth();
 
-  // Check if user has admin privileges
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertDescription>
-              You need admin privileges to access this application.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
+  // ProtectedRoute handles all authentication and authorization logic
+  // No need for additional checks here
+
 
   const handleCreateAssessment = () => {
     navigate('/assessment/new');
