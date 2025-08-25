@@ -55,15 +55,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Stable functions that don't depend on state
   const signup = useCallback(async (email: string, password: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    if (user) {
-      await user.sendEmailVerification();
-      console.log('Email verification sent to:', user.email);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      if (user) {
+        try {
+          await user.sendEmailVerification();
+          console.log('Email verification sent to:', user.email);
+        } catch (emailError) {
+          console.error('Failed to send verification email:', emailError);
+          // Don't throw here - user is still created, just email failed
+        }
+      }
+      
+      return userCredential;
+    } catch (error) {
+      console.error('Signup failed:', error);
+      throw error;
     }
-    
-    return userCredential;
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

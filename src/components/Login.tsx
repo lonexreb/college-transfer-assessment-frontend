@@ -46,8 +46,14 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
       setLoading(true);
       
       if (isSignupMode) {
-        await signup(email, password);
-        setShowEmailVerification(true);
+        try {
+          await signup(email, password);
+          console.log('Signup completed, should have sent verification email');
+          setShowEmailVerification(true);
+        } catch (signupError) {
+          console.error('Signup error:', signupError);
+          throw signupError;
+        }
       } else {
         await login(email, password);
       }
