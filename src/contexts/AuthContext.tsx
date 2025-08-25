@@ -183,6 +183,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Only reload if we need fresh verification status
     await reload(freshUser);
     
+    // Update the current user state with fresh verification status
+    setCurrentUser({ ...freshUser });
+    
     if (!freshUser.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
