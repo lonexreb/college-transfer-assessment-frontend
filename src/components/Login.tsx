@@ -22,7 +22,8 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
   const [loading, setLoading] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [showMFA, setShowMFA] = useState(false);
-  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha } = useAuth();
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const { login, signup, mfaError, resolveMFA, clearMfaError, setupRecaptcha, sendEmailVerification, checkEmailVerification } = useAuth();
 
   useEffect(() => {
     if (mfaError) {
@@ -45,6 +46,9 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
       
       if (isSignupMode) {
         await signup(email, password);
+        // After signup, automatically send verification email
+        await sendEmailVerification();
+        setShowEmailVerification(true);
       } else {
         await login(email, password);
       }
@@ -80,6 +84,80 @@ const Login = ({ onToggleMode, isSignupMode }: LoginProps) => {
     setMfaCode('');
     clearMfaError();
     setError('');
+  }
+
+  async function handleEmailVerification(e: React.FormEvent) {
+    e.preventDefault();
+    
+    try {
+      setError('');
+      setLoading(true);
+      await checkEmailVerification();
+      setShowEmailVerification(false);
+      // User will be redirected by the auth context after verification
+    } catch (error: any) {
+      setError(error.message || 'Email not yet verified');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleBackToSignup() {
+    setShowEmailVerification(false);
+    setError('');
+  }
+
+  if (showEmailVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              Verify Your Email
+            </CardTitle>
+            <CardDescription className="text-center">
+              We've sent a verification link to {email}. Please check your email and click the link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleEmailVerification} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              <Alert>
+                <AlertDescription>
+                  After clicking the verification link in your email, come back here and click the button below.
+                </AlertDescription>
+              </Alert>
+              
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={loading}
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                I've Verified My Email
+              </Button>
+            </form>
+            
+            <div className="mt-4 text-center">
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 h-auto font-normal"
+                onClick={handleBackToSignup}
+                disabled={loading}
+              >
+                Back to Signup
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (showMFA) {

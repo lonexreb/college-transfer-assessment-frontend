@@ -12,54 +12,18 @@ import { ConfirmationResult } from 'firebase/auth';
 const MFASetup = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [step, setStep] = useState<'email' | 'phone' | 'verify'>('email');
+  const [step, setStep] = useState<'phone' | 'verify'>('phone');
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
-  const { currentUser, setupMFA, verifyMFASetup, setupRecaptcha, sendEmailVerification, checkEmailVerification } = useAuth();
+  const { currentUser, setupMFA, verifyMFASetup, setupRecaptcha } = useAuth();
 
   useEffect(() => {
     setupRecaptcha('mfa-recaptcha-container');
-    
-    // Check if email is already verified
-    if (currentUser?.emailVerified) {
-      setStep('phone');
-    }
-  }, [setupRecaptcha, currentUser]);
+  }, [setupRecaptcha]);
 
-  async function handleSendEmailVerification(e: React.FormEvent) {
-    e.preventDefault();
-    
-    try {
-      setError('');
-      setLoading(true);
-      
-      await sendEmailVerification();
-      setEmailVerificationSent(true);
-    } catch (error: any) {
-      setError(error.message || 'Failed to send verification email');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCheckEmailVerification(e: React.FormEvent) {
-    e.preventDefault();
-    
-    try {
-      setError('');
-      setLoading(true);
-      
-      await checkEmailVerification();
-      setStep('phone');
-    } catch (error: any) {
-      setError(error.message || 'Email not yet verified');
-    } finally {
-      setLoading(false);
-    }
-  }
+  
 
   async function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,13 +61,12 @@ const MFASetup = () => {
   }
 
   function resetSetup() {
-    setStep(currentUser?.emailVerified ? 'phone' : 'email');
+    setStep('phone');
     setPhoneNumber('');
     setVerificationCode('');
     setConfirmationResult(null);
     setError('');
     setSuccess(false);
-    setEmailVerificationSent(false);
   }
 
   if (success) {
@@ -135,76 +98,14 @@ const MFASetup = () => {
           Setup Two-Factor Authentication
         </CardTitle>
         <CardDescription className="text-center">
-          {step === 'email' 
-            ? 'First, verify your email address to enable multi-factor authentication'
-            : step === 'phone' 
+          {step === 'phone' 
             ? 'Add your phone number for additional security'
             : 'Enter the verification code sent to your phone'
           }
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {step === 'email' ? (
-          <div className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            
-            {emailVerificationSent ? (
-              <div className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Verification email sent to {currentUser?.email}. Please check your email and click the verification link.
-                  </AlertDescription>
-                </Alert>
-                
-                <form onSubmit={handleCheckEmailVerification} className="space-y-4">
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={loading}
-                  >
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    I've Verified My Email
-                  </Button>
-                </form>
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setEmailVerificationSent(false)}
-                  disabled={loading}
-                >
-                  Resend Verification Email
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleSendEmailVerification} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Email Address</Label>
-                  <div className="p-3 bg-muted rounded-md">
-                    {currentUser?.email || 'No email found'}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    We'll send a verification link to this email address.
-                  </p>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send Verification Email
-                </Button>
-              </form>
-            )}
-          </div>
-        ) : step === 'phone' ? (
+        {step === 'phone' ? (
           <form onSubmit={handlePhoneSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
