@@ -178,16 +178,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser]);
 
   const checkEmailVerification = useCallback(async () => {
-    const freshUser = auth.currentUser;
-    if (!freshUser) {
+    const user = auth.currentUser;
+    if (!user) {
       throw new Error('No user is currently signed in');
     }
 
-    await reload(freshUser);
+    // Force refresh the user to get latest verification status
+    await reload(user);
     
-    if (!freshUser.emailVerified) {
+    if (!user.emailVerified) {
       throw new Error('Email is not yet verified. Please check your email and click the verification link.');
     }
+
+    // User is now verified, trigger auth state update
+    // This will cause the auth listener to run and check admin status
   }, []);
 
   const checkAdminStatus = useCallback(async (user: User | null) => {
@@ -236,26 +240,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       
       setCurrentUser(user);
-      setLoading(false);
       
-      // Only check admin status after user is set and loading is done
+      // Clear admin status first
+      setIsAdmin(false);
+      
+      // Only check admin status for verified users
       if (user && user.emailVerified) {
-        // Use a small delay to ensure state is settled
-        setTimeout(() => {
-          if (mounted) {
-            checkAdminStatus(user);
-          }
-        }, 100);
-      } else {
-        setIsAdmin(false);
+        checkAdminStatus(user);
       }
+      
+      setLoading(false);
     });
 
     return () => {
       mounted = false;
       unsubscribe();
     };
-  }, [checkAdminStatus]);
+  }, []); // Remove checkAdminStatus dependency to prevent recursion
 
   const value = useMemo(() => ({
     currentUser,
