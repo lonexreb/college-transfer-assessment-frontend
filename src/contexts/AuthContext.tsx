@@ -257,32 +257,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        setIsAdmin(data.isAdmin || false);
+        // Only update state if it actually changes to prevent unnecessary re-renders
+        const adminStatus = data.isAdmin || false;
+        setIsAdmin(prevIsAdmin => prevIsAdmin !== adminStatus ? adminStatus : prevIsAdmin);
       } else {
-        setIsAdmin(false);
+        setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
-      setIsAdmin(false);
+      setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
     } finally {
       checkingAdminRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!mounted) return;
-
       setCurrentUser(user);
       setLoading(false);
     });
 
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
+    return unsubscribe;
   }, []);
 
   // Separate useEffect for admin status check
@@ -290,11 +285,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentUser?.emailVerified) {
       checkAdminStatus(currentUser);
     } else {
-      setIsAdmin(false);
+      setIsAdmin(prevIsAdmin => prevIsAdmin !== false ? false : prevIsAdmin);
     }
-  }, [currentUser?.emailVerified, currentUser?.uid, checkAdminStatus]);
+  }, [currentUser, checkAdminStatus]);
 
-  const value = useMemo(() => ({
+  // Remove useMemo to prevent recursion from unstable dependencies
+  const value: AuthContextType = {
     currentUser,
     isAdmin,
     login,
@@ -310,23 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sendEmailVerification,
     checkEmailVerification,
     emailVerificationSent
-  }), [
-    currentUser,
-    isAdmin,
-    login,
-    signup,
-    logout,
-    loading,
-    mfaError,
-    setupMFA,
-    verifyMFASetup,
-    resolveMFA,
-    setupRecaptcha,
-    clearMfaError,
-    sendEmailVerification,
-    checkEmailVerification,
-    emailVerificationSent
-  ]);
+  };
 
   return (
     <AuthContext.Provider value={value}>
