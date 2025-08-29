@@ -387,7 +387,7 @@ const ComparisonTool = () => {
       // Create form data
       const formData = new FormData();
       formData.append('prompt', `School Comparison Analysis: ${comparisonResult.ai_report}`);
-      formData.append('n_slides', '8');
+      formData.append('n_slides', '28');
       formData.append('language', 'English');
       formData.append('template', 'general');
       formData.append('export_as', 'pptx');
@@ -458,7 +458,7 @@ const ComparisonTool = () => {
 
               // Handle step-based progress
               if (data.step !== undefined) {
-                const stepProgress = (data.step / 8) * 100; // Assuming 8 steps total
+                const stepProgress = (data.step / 28) * 100; // Assuming 28 steps total
                 console.log('📈 Setting step progress:', stepProgress, `(step ${data.step})`);
                 setPresentationProgress(Math.min(100, Math.max(0, stepProgress)));
               }
