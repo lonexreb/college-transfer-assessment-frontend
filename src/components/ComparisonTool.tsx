@@ -870,30 +870,19 @@ const ComparisonTool = () => {
                     <div className="prose max-w-none text-foreground">
                       <ReactMarkdown
                         components={{
-                          h1: ({children}) => <h1 className="text-2xl font-bold mb-4 text-foreground leading-tight">{children}</h1>,
-                          h2: ({children}) => <h2 className="text-xl font-semibold mb-3 text-foreground leading-tight">{children}</h2>,
-                          h3: ({children}) => <h3 className="text-lg font-medium mb-2 text-foreground leading-tight">{children}</h3>,
-                          h4: ({children}) => <h4 className="text-base font-medium mb-2 text-foreground leading-tight">{children}</h4>,
-                          h5: ({children}) => <h5 className="text-sm font-medium mb-2 text-foreground leading-tight">{children}</h5>,
-                          h6: ({children}) => <h6 className="text-xs font-medium mb-2 text-foreground leading-tight">{children}</h6>,
-                          p: ({children}) => <p className="mb-3 text-foreground leading-relaxed whitespace-pre-wrap">{children}</p>,
-                          ul: ({children}) => <ul className="list-disc list-inside mb-3 text-foreground space-y-1">{children}</ul>,
-                          ol: ({children}) => <ol className="list-decimal list-inside mb-3 text-foreground space-y-1">{children}</ol>,
-                          li: ({children}) => <li className="mb-1 text-foreground leading-relaxed">{children}</li>,
-                          strong: ({children}) => <strong className="font-bold text-foreground">{children}</strong>,
+                          h1: ({children}) => <h1 className="text-2xl font-bold mb-4 text-foreground">{children}</h1>,
+                          h2: ({children}) => <h2 className="text-xl font-semibold mb-3 text-foreground">{children}</h2>,
+                          h3: ({children}) => <h3 className="text-lg font-medium mb-2 text-foreground">{children}</h3>,
+                          p: ({children}) => <p className="mb-3 text-foreground leading-relaxed">{children}</p>,
+                          ul: ({children}) => <ul className="list-disc list-inside mb-3 text-foreground">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside mb-3 text-foreground">{children}</ol>,
+                          li: ({children}) => <li className="mb-1 text-foreground">{children}</li>,
+                          strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
                           em: ({children}) => <em className="italic text-foreground">{children}</em>,
-                          blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 italic mb-3 text-muted-foreground bg-muted/20 py-2 rounded-r">{children}</blockquote>,
+                          blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 italic mb-3 text-muted-foreground">{children}</blockquote>,
                           code: ({inline, children}) => inline ? 
-                            <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-foreground border">{children}</code> :
-                            <code className="block bg-muted p-4 rounded text-sm font-mono overflow-x-auto mb-3 text-foreground border leading-relaxed whitespace-pre-wrap">{children}</code>,
-                          table: ({children}) => <table className="w-full border-collapse border border-border mb-4">{children}</table>,
-                          thead: ({children}) => <thead className="bg-muted">{children}</thead>,
-                          tbody: ({children}) => <tbody>{children}</tbody>,
-                          tr: ({children}) => <tr className="border-b border-border">{children}</tr>,
-                          th: ({children}) => <th className="border border-border px-3 py-2 text-left font-semibold text-foreground">{children}</th>,
-                          td: ({children}) => <td className="border border-border px-3 py-2 text-foreground">{children}</td>,
-                          hr: () => <hr className="my-4 border-border" />,
-                          a: ({href, children}) => <a href={href} className="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank" rel="noopener noreferrer">{children}</a>
+                            <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">{children}</code> :
+                            <code className="block bg-muted p-3 rounded text-sm font-mono overflow-x-auto mb-3">{children}</code>
                         }}
                       >
                         {comparisonResult.ai_report || 'Generating analysis...'}
