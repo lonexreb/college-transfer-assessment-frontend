@@ -1,0 +1,268 @@
+from pptx import Presentation, parts
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+import replicate
+import os
+
+os.environ[
+    "REPLICATE_API_TOKEN"] = "r8_3f4c6b8d3b6e2e5e1e4c9b7f4a5b6c7d8e9f0a1b2c3d4e5f6g7h8i9j0k1l2m3n"
+
+
+def GenerateReportJSON(research):
+    prompt = f"Research: {research}\n\n Response Guidelines: "
+    result = ""
+
+    with open('filename.txt', 'r') as file:
+        prompt += file.read()
+    for event in replicate.stream(
+            "anthropic/claude-4-sonnet",
+            input=
+        {
+            "prompt": prompt,
+            "max_tokens": 8192,
+            "system_prompt":
+            "You are a transfer student assessment analyst. Based on the scraped website data provided for a university, generate a comprehensive JSON object that evaluates the institution's transfer friendliness according to DegreeSight's Transfer Friendliness Assessment (TFA) rubric.",
+            "extended_thinking": False,
+            "max_image_resolution": 0.5,
+            "thinking_budget_tokens": 1024
+        },
+    ):
+        print(str(event), end="")
+        result += str(event)
+    return result
+
+
+def GeneratePresentation(result):
+
+    def replace_text_in_slide(slide, replacements, score_replacement=None):
+        """Replace text in all text frames of a slide."""
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text_frame = shape.text_frame
+                for paragraph in text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        # Handle score replacement specially (replaces entire run text)
+                        if score_replacement and "Score" in run.text:
+                            run.text = score_replacement
+                        else:
+                            # Handle normal text replacements
+                            for old_text, new_text in replacements.items():
+                                if old_text in run.text:
+                                    run.text = run.text.replace(
+                                        old_text, new_text)
+
+    def replace_image_in_slide(slide, image_filename):
+        """Replace the first image found in a slide."""
+        for shape in slide.shapes:
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                im = parts.image.Image.from_file(image_filename)
+                slide_part, rId = shape.part, shape._element.blip_rId
+                image_part = slide_part.related_part(rId)
+                image_part.blob = im._blob
+                break  # Only replace the first image
+
+    def completely_replace_text_content(slide, target_text, new_text):
+        """Completely replace text frame content with new text, preserving formatting and forcing top-left alignment."""
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text_frame = shape.text_frame
+                # Check if any paragraph contains the target text
+                target_found = False
+
+                for paragraph in text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        if target_text in run.text:
+                            target_found = True
+                            break
+                    if target_found:
+                        break
+
+                if target_found:
+                    # Store formatting from the first run before clearing
+                    original_font_name = None
+                    original_font_size = None
+                    original_font_bold = None
+                    original_font_italic = None
+                    original_font_color = None
+
+                    # Get formatting from the first available run
+                    for paragraph in text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            if run.text.strip():  # Find first non-empty run
+                                if hasattr(run.font, 'name'):
+                                    original_font_name = run.font.name
+                                if hasattr(run.font, 'size'):
+                                    original_font_size = run.font.size
+                                if hasattr(run.font, 'bold'):
+                                    original_font_bold = run.font.bold
+                                if hasattr(run.font, 'italic'):
+                                    original_font_italic = run.font.italic
+                                if hasattr(run.font, 'color'):
+                                    try:
+                                        original_font_color = run.font.color.rgb
+                                    except:
+                                        original_font_color = None
+                                break
+                        if original_font_name is not None:  # Found formatting, break outer loop
+                            break
+
+                    # Clear all existing paragraphs
+                    paragraphs_to_remove = text_frame.paragraphs[
+                        1:]  # Keep first paragraph
+                    for p in paragraphs_to_remove:
+                        p._element.getparent().remove(p._element)
+
+                    # Clear the first paragraph completely
+                    first_para = text_frame.paragraphs[0]
+                    first_para.clear()
+
+                    # Add ONLY the new text
+                    first_para.text = new_text
+
+                    # Force top-left alignment - FIXED VERTICAL ALIGNMENT
+                    text_frame.vertical_anchor = MSO_ANCHOR.TOP
+                    text_frame.word_wrap = True  # Ensure proper text wrapping
+
+                    # Set paragraph alignment to left
+                    first_para.alignment = PP_ALIGN.LEFT
+
+                    # Also set the text box to auto-fit for better top alignment
+                    text_frame.auto_size = None  # Disable auto-size for better control
+
+                    if first_para.runs:
+                        new_run = first_para.runs[0]
+                        if original_font_name:
+                            new_run.font.name = original_font_name
+                        if original_font_size:
+                            new_run.font.size = original_font_size
+                        if original_font_bold is not None:
+                            new_run.font.bold = original_font_bold
+                        if original_font_italic is not None:
+                            new_run.font.italic = original_font_italic
+                        if original_font_color:
+                            try:
+                                new_run.font.color.rgb = original_font_color
+                            except:
+                                pass  # Skip color if it can't be applied
+
+                    # Break here so we only replace the first matching text frame
+                    break
+
+    prs = Presentation("TFA.pptx")
+
+    # Common replacements
+    university_replacement = {"NAME OF THE UNIVERSITY": result["university"]}
+
+    # Slide configurations: (slide_index, text_replacements, image_file, complete_text_replacements, score_replacement)
+    slide_configs = [
+        # Title slide
+        (0, university_replacement, None, {}, None),
+
+        # Big Question 1 - Title
+        (7, university_replacement, None, {}, None),
+
+        # Big Question 1 - Readiness (image)
+        (8, {}, f'{result["Question1"]}.png', {}, None),
+
+        # Big Question 1 - Review
+        (9, university_replacement, None, {
+            "Dedicated transfer student page": result["Question1Insights"]
+        }, f"Score: {result['Question1']}"),
+
+        # Big Question 2 - Title
+        (10, university_replacement, None, {}, None),
+
+        # Big Question 2 - Readiness (image)
+        (11, {}, f'{result["Question2"]}.png', {}, None),
+
+        # Big Question 2 - Review
+        (12, university_replacement, None, {
+            "Section dedicated to": result["Question2Insights"]
+        }, f"Score: {result['Question2']}"),
+
+        # Big Question 3 - Title
+        (13, university_replacement, None, {}, None),
+
+        # Big Question 3 - Readiness (image)
+        (14, {}, f'{result["Question3"]}.png', {}, None),
+
+        # Big Question 3 - Review
+        (15, university_replacement, None, {
+            "Generous merit-based scholarships for transfer students":
+            result["Question3Insights"]
+        }, f"Score: {result['Question3']}"),
+
+        # Transfer Readiness (image)
+        (16, {}, f'{result["OverallScore"]}.png', {}, None),
+
+        # Action Items
+        (17, university_replacement, None, {
+            "Implement a course-by-course": result["ActionItems"]
+        }, None),
+
+        # Overall Comparison Title
+        (18, university_replacement, None, {
+            "Implement a course-by-course": result["ComparisonInsights"]
+        }, None),
+
+        # Overall Comparison Score (image)
+        (19, {}, f'{result["OverallScore"]}.png', {}, None),
+
+        # Competitors Comparison Title
+        (20, university_replacement, None, {
+            "Implement a course-by-course": result["CompetitorInsights"]
+        }, None),
+
+        # Competitors Comparison Score (image)
+        (21, {}, f'{result["CompetitorsScore"]}.png', {}, None),
+    ]
+
+    # Process all slides
+    for slide_idx, text_replacements, image_file, complete_text_replacements, score_replacement in slide_configs:
+        slide = prs.slides[slide_idx]
+
+        # Replace text (including score if specified)
+        if text_replacements or score_replacement:
+            replace_text_in_slide(slide, text_replacements, score_replacement)
+
+        # Replace image
+        if image_file:
+            replace_image_in_slide(slide, image_file)
+
+        # Completely replace text frames with new content
+        for target_text, new_text in complete_text_replacements.items():
+            completely_replace_text_content(slide, target_text, new_text)
+
+    # Save the presentation
+    prs.save("output.pptx")
+    print("Presentation saved as output.pptx")
+
+
+def main():
+    # Data to populate the presentation
+    result = {
+        "university": "Technology",
+        "course": "Computer Science",
+        "student": "John Doe",
+        "grade": "A",
+        "date": "2023-10-10",
+        "Question1": "5",
+        "Question2": "5",
+        "Question3": "5",
+        "OverallScore": "5",
+        "Question1Insights": "this is some random stuff",
+        "Question2Insights": "this is some gay stuff",
+        "Question3Insights": "question 3 insights here",
+        "ComparisonScore": "5",
+        "CompetitorsScore": "5",
+        "ComparisonInsights": "comparison insights here",
+        "CompetitorInsights": "competitor insights here",
+        "ActionItems": "action items here"
+    }
+
+    # Load presentation
+    GeneratePresentation(result)
+
+
+if __name__ == "__main__":
+    main()
