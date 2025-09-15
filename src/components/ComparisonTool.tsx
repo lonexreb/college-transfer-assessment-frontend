@@ -26,6 +26,11 @@ interface SchoolData {
   in_state_tuition: number;
   out_of_state_tuition: number;
   median_earnings_10yr: number;
+  website?: string; // Added website property
+  search_sources?: string[]; // Added for searched links
+  search_transfer_data?: { // Added for search analysis
+    targeted_data?: string;
+  };
 }
 
 interface ComparisonWeights {
@@ -409,7 +414,7 @@ const ComparisonTool = () => {
       }
 
       console.log('📡 Processing SSE response...');
-      
+
       // Handle SSE response from the POST request
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -440,7 +445,7 @@ const ComparisonTool = () => {
           // Parse SSE format: "data: {...}"
           if (line.startsWith('data: ')) {
             const jsonStr = line.slice(6).trim();
-            
+
             if (jsonStr === '[DONE]') {
               console.log('🏁 Received [DONE] signal');
               continue;
@@ -481,7 +486,7 @@ const ComparisonTool = () => {
               // Handle completion
               if (data.complete || data.result || data.presentation_id) {
                 console.log('🎉 Presentation generation complete:', data);
-                
+
                 const result = data.result || data;
                 setPresentationResult(result);
                 setPresentationProgress(100);
@@ -492,7 +497,7 @@ const ComparisonTool = () => {
                   setPresentationProgress(0);
                   setPresentationStepMessage('');
                 }, 2000);
-                
+
                 return; // Exit the function
               }
 
@@ -514,7 +519,7 @@ const ComparisonTool = () => {
     } catch (error) {
       console.error('🚨 Presentation generation error:', error);
       setError(`Failed to generate presentation: ${error.message}`);
-      
+
       setTimeout(() => {
         setIsGeneratingPresentation(false);
         setPresentationProgress(0);
