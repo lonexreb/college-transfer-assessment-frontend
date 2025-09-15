@@ -1,0 +1,434 @@
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import json
+import requests
+import replicate
+from firecrawl import FirecrawlApp, JsonConfig
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for college routes")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api", tags=["college"])
+
+COLLEGECARD_API_KEY = "wERrN1T3KXGwxd9PLxQsipqSvb9mYUcgMUaA3wp0"
+FIRECRAWL_API_KEY = "fc-7578a68f054f419dbc1eee9ea570fe39"
+
+# Pydantic models
+class SearchRequest(BaseModel):
+    query: str
+
+class CompareRequest(BaseModel):
+    schools: List[str]
+    weights: Optional[Dict[str, int]] = None
+
+class School(BaseModel):
+    name: str
+    city: str
+    state: str
+    website: str
+    ownership: str
+    size: Optional[int]
+
+class SearchResponse(BaseModel):
+    schools: List[School]
+
+class TransferDataSchema(BaseModel):
+    has_transfer_page: bool
+    transfer_navigation_ease: int  # 1-5 rating
+    has_credit_evaluation_tool: bool
+    has_articulation_agreements: bool
+    transfer_specific_financial_aid: bool
+    has_transfer_counselor_contact: bool
+    transfer_testimonials_present: bool
+    application_process_clarity: int  # 1-5 rating
+
+def get_ownership_type(ownership_code):
+    ownership_types = {
+        1: 'Public',
+        2: 'Private nonprofit',
+        3: 'Private for-profit'
+    }
+    return ownership_types.get(ownership_code, 'Unknown')
+
+def search_college_transfer_info(college_name):
+    try:
+        app_firecrawl = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
+        
+        # Search for transfer-specific information about the college
+        search_query = f"{college_name} transfer students credit evaluation articulation agreements financial aid"
+        
+        # Search the internet for transfer information
+        search_result = app_firecrawl.search(
+            query=search_query,
+            limit=5,
+            scrape_options={
+                "formats": ["markdown"],
+                "only_main_content": True
+            }
+        )
+        
+        if search_result and 'data' in search_result:
+            transfer_content = ""
+            sources = []
+            all_sources = []  # Track all searched URLs
+            
+            for result in search_result['data']:
+                url = result.get('url', 'Unknown source')
+                all_sources.append(url)  # Add all URLs to sources list
+                
+                if 'markdown' in result and result['markdown']:
+                    # Extract transfer-relevant content
+                    markdown = result['markdown']
+                    transfer_keywords = ['transfer', 'credit', 'articulation', 'equivalency', 'admissions', 'financial aid']
+                    
+                    lines = markdown.split('\n')
+                    relevant_lines = []
+                    for line in lines:
+                        if any(keyword.lower() in line.lower() for keyword in transfer_keywords):
+                            relevant_lines.append(line.strip())
+                    
+                    if relevant_lines:
+                        transfer_content += f"\n\nFrom {url}:\n"
+                        transfer_content += "\n".join(relevant_lines[:10])  # Limit to 10 most relevant lines per source
+                        sources.append(url)
+            
+            return {
+                'search_content': transfer_content[:4000] if transfer_content else f"Limited transfer information found for {college_name}",
+                'sources': all_sources,  # Return all searched URLs
+                'relevant_sources': sources,  # URLs with relevant content
+                'targeted_data': f"Searched internet for {college_name} transfer information - found {len(sources)} relevant sources with transfer-specific content out of {len(all_sources)} total sources searched."
+            }
+        
+        return {
+            'targeted_data': f"Internet search completed for {college_name} but limited transfer information found."
+        }
+    
+    except Exception as e:
+        print(f"Error searching transfer information for {college_name}: {str(e)}")
+        return {
+            'targeted_data': f"Unable to search transfer information for {college_name} - analysis based on publicly available data only."
+        }
+
+@router.post("/search", response_model=SearchResponse)
+async def search_colleges(request: SearchRequest):
+    try:
+        query = request.query.strip()
+
+        if not query:
+            raise HTTPException(status_code=400, detail='Search query is required')
+
+        # College Scorecard API endpoint with properly encoded parameters
+        params = {
+            'api_key': COLLEGECARD_API_KEY,
+            'school.name': query,
+            'fields': 'school.name,school.city,school.state,school.school_url,school.ownership,2022.student.size',
+            '_per_page': '20'
+        }
+        
+        api_url = 'https://api.data.gov/ed/collegescorecard/v1/schools'
+        response = requests.get(api_url, params=params)
+        response.raise_for_status()
+
+        api_data = response.json()
+        schools = []
+
+        for school_data in api_data.get('results', []):
+            school = School(
+                name=school_data.get('school.name', 'N/A'),
+                city=school_data.get('school.city', 'N/A'),
+                state=school_data.get('school.state', 'N/A'),
+                website=school_data.get('school.school_url', '#'),
+                ownership=get_ownership_type(school_data.get('school.ownership')),
+                size=school_data.get('2022.student.size')
+            )
+            schools.append(school)
+
+        return SearchResponse(schools=schools)
+
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f'API request failed: {str(e)}')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'An error occurred: {str(e)}')
+
+@router.post("/compare")
+async def compare_schools(request: CompareRequest):
+    return await _compare_schools_helper(request, stream=False)
+
+@router.post("/compare-stream")
+async def compare_schools_stream(request: CompareRequest):
+    return await _compare_schools_helper(request, stream=True)
+
+async def _compare_schools_helper(request: CompareRequest, stream: bool = False):
+    try:
+        school_names = request.schools
+        weights = request.weights
+
+        if len(school_names) < 2:
+            raise HTTPException(status_code=400, detail='At least 2 schools are required for comparison')
+
+        # Fetch data for each school
+        schools_data = []
+        for school_name in school_names:
+            params = {
+                'api_key': COLLEGECARD_API_KEY,
+                'school.name': school_name,
+                'fields': 'school.name,school.city,school.state,school.school_url,school.ownership,2022.student.size,2022.admissions.admission_rate.overall,2022.cost.tuition.in_state,2022.cost.tuition.out_of_state,2022.earnings.10_yrs_after_entry.median',
+                '_per_page': '1'
+            }
+            
+            api_url = 'https://api.data.gov/ed/collegescorecard/v1/schools'
+            response = requests.get(api_url, params=params)
+            response.raise_for_status()
+
+            api_data = response.json()
+            results = api_data.get('results', [])
+            print(f"API Data for {school_name}: {results}")
+            if results:
+                school_info = results[0]
+                website_url = school_info.get('school.school_url', '#')
+                print(website_url)
+                # Search the internet for transfer data
+                search_data = search_college_transfer_info(school_name)
+                
+                school_data = {
+                    'name': school_info.get('school.name', 'N/A'),
+                    'city': school_info.get('school.city', 'N/A'),
+                    'state': school_info.get('school.state', 'N/A'),
+                    'website': website_url,
+                    'ownership': get_ownership_type(school_info.get('school.ownership')),
+                    'student_size': school_info.get('2022.student.size'),
+                    'admission_rate': school_info.get('2022.admissions.admission_rate.overall'),
+                    'in_state_tuition': school_info.get('2022.cost.tuition.in_state'),
+                    'out_of_state_tuition': school_info.get('2022.cost.tuition.out_of_state'),
+                    'median_earnings_10yr': school_info.get('2022.earnings.10_yrs_after_entry.median'),
+                    'search_transfer_data': search_data,
+                    'search_sources': search_data.get('sources', []) if search_data else []
+                }
+                schools_data.append(school_data)
+
+        if not schools_data:
+            raise HTTPException(status_code=404, detail='No school data found')
+
+        # Select the first school as the main reference school
+        main_school = schools_data[0]
+        comparison_schools = schools_data[1:]
+
+        main_school_summary = f"""School: {main_school['name']}
+Location: {main_school['city']}, {main_school['state']}
+Type: {main_school['ownership']}
+Student Size: {main_school['student_size'] if main_school['student_size'] else 'N/A'}
+Admission Rate: {f"{main_school['admission_rate']:.2%}" if main_school['admission_rate'] else 'N/A'}
+In-State Tuition: {f"${main_school['in_state_tuition']:,}" if main_school['in_state_tuition'] else 'N/A'}
+Out-of-State Tuition: {f"${main_school['out_of_state_tuition']:,}" if main_school['out_of_state_tuition'] else 'N/A'}
+Median Earnings (10 years): {f"${main_school['median_earnings_10yr']:,}" if main_school['median_earnings_10yr'] else 'N/A'}"""
+
+        comparison_schools_summary = "\n".join([
+            f"""School: {school['name']}
+Location: {school['city']}, {school['state']}
+Type: {school['ownership']}
+Student Size: {school['student_size'] if school['student_size'] else 'N/A'}
+Admission Rate: {f"{school['admission_rate']:.2%}" if school['admission_rate'] else 'N/A'}
+In-State Tuition: {f"${school['in_state_tuition']:,}" if school['in_state_tuition'] else 'N/A'}
+Out-of-State Tuition: {f"${school['out_of_state_tuition']:,}" if school['out_of_state_tuition'] else 'N/A'}
+Median Earnings (10 years): {f"${school['median_earnings_10yr']:,}" if school['median_earnings_10yr'] else 'N/A'}"""
+            for school in comparison_schools
+        ])
+
+        # Build assessment criteria section based on Transfer Friendliness Assessment
+        assessment_section = ""
+        if weights:
+            assessment_section = f"""
+ASSESSMENT WEIGHTS (Focus your analysis on these weighted criteria):
+- Transfer Navigation (Website ease of finding transfer info): {weights.get('transfer_navigation', 0)}%
+- Landing Pages (Quality of transfer-specific pages): {weights.get('landing_pages', 0)}%
+- Evaluation Tools (Course equivalency/credit evaluation tools): {weights.get('evaluation_tools', 0)}%
+- Articulation Agreements (Number and accessibility): {weights.get('articulation_agreements', 0)}%
+- Support Resources (Transfer counseling and support): {weights.get('support_resources', 0)}%
+- Application Process (Clarity and simplicity): {weights.get('application_process', 0)}%
+
+Please weight your analysis according to these percentages, giving more emphasis to higher-weighted criteria.
+"""
+
+        # Build search data summary
+        search_data_summary = ""
+        for school in schools_data:
+            if school.get('search_transfer_data'):
+                search_data_summary += f"\n\nINTERNET SEARCH DATA FOR {school['name']}:\n"
+                search_data = school['search_transfer_data']
+                if search_data.get('targeted_data'):
+                    search_data_summary += f"Search Analysis: {search_data['targeted_data']}\n"
+                if search_data.get('search_content'):
+                    search_data_summary += f"Transfer Content Found: {search_data['search_content'][:1000]}...\n"
+                if search_data.get('sources'):
+                    search_data_summary += f"Sources: {', '.join(search_data['sources'][:3])}\n"
+        
+        # Get assessment prompt from Firebase
+        longPrompt = ""
+        try:
+            doc_ref = db.collection('prompts').document('assessment')
+            doc = doc_ref.get()
+            if doc.exists:
+                longPrompt = doc.to_dict().get('content', '')
+            else:
+                # Fallback to file
+                with open('prompt.txt', 'r') as file:
+                    longPrompt = file.read()
+        except Exception as e:
+            print(f"Error getting assessment prompt: {e}")
+            # Final fallback to file
+            try:
+                with open('prompt.txt', 'r') as file:
+                    longPrompt = file.read()
+            except:
+                longPrompt = "You are an expert college transfer assessment analyst."
+
+        prompt = f"""Conduct a Transfer Friendliness Assessment for these colleges using the following framework. Analyze as if you are a tenured transfer enrollment professional viewing through the eyes of a prospective transfer student.
+
+IMPORTANT: Use the real internet search data provided below to make accurate assessments instead of assumptions. This data comes from searching the web for transfer-specific information about each college.
+
+{search_data_summary}
+
+TRANSFER FRIENDLINESS LEVELS (Rate each college 1-5):
+Level 1 – Transfer-Resistant: Minimal support, unclear pathways, limited acknowledgment of transfer student needs
+Level 2 – Transfer-Curious: Some signs of transfer interest, but inconsistent or underdeveloped policies  
+Level 3 – Transfer-Conscious: Recognizes and responds to transfer needs with decent resources and outreach
+Level 4 – Transfer-Ready: Actively supports transfer students with pathways, tools, and dedicated staff
+Level 5 – Transfer-First: Transfer students are core audience with seamless support and strategic priority
+
+MAIN REFERENCE SCHOOL (Primary College):
+{main_school_summary}
+
+COMPARISON SCHOOLS:
+{comparison_schools_summary}
+
+{assessment_section}
+
+For each college, evaluate these 3 BIG QUESTIONS:
+
+BIG QUESTION 1 - Are transfer students a priority at this college?
+Assess based on:
+- Transfer testimonials and success stories
+- Established transfer community presence
+- Specific transfer web pages and quick access
+- Dedicated staff contact information for transfers
+- Welcome messages showing transfer students are planned for
+- Prominence of transfer information on main pages
+
+BIG QUESTION 2 - How will students' credits transfer to this college?
+Assess based on:
+- Real-time, on-demand credit evaluation tools available before application
+- Established articulation agreements and transfer pathways
+- Mobile-friendly credit evaluation process
+- Whether evaluation requires admission first (lower rating if yes)
+- Clarity of transfer credit policies
+
+BIG QUESTION 3 - Does this college articulate affordability/ability to pay?
+Assess based on:
+- Clear affordability messages to transfer students
+- Transfer-specific financial aid and scholarships
+- Success stories/testimonials about affordability
+- Cost comparison information
+- Payment options and financial aid accessibility
+
+REQUIRED OUTPUT FORMAT:
+
+For {main_school['name']} (Primary College):
+BIG QUESTION 1: [Rating and 5+ specific bullet points]
+BIG QUESTION 2: [Rating and 5+ specific bullet points] 
+BIG QUESTION 3: [Rating and 5+ specific bullet points]
+Overall Transfer Friendliness Level: [1-5 with level name]
+
+For each comparison school:
+BIG QUESTION 1: [Rating and 5+ specific bullet points]
+BIG QUESTION 2: [Rating and 5+ specific bullet points]
+BIG QUESTION 3: [Rating and 5+ specific bullet points] 
+Overall Transfer Friendliness Level: [1-5 with level name]
+
+ACTION ITEMS FOR {main_school['name']}:
+HIGH PRIORITY: [2+ recommendations]
+MEDIUM PRIORITY: [4+ recommendations] 
+LOW PRIORITY: [5+ recommendations]
+Competitive Advantages to Maintain: [6+ advantages]
+
+SUMMARY TABLE:
+Present a comparison table showing all schools and their ratings for each big question plus overall level.
+
+Focus your assessment on transfer-specific features rather than general academic metrics.
+""" + longPrompt
+
+        if stream:
+            async def generate():
+                # First send the school data (includes search sources)
+                yield f"data: {json.dumps({'type': 'schools_data', 'data': schools_data})}\n\n"
+                
+                # Then stream the AI report
+                report_text = ""
+                for event in replicate.stream(
+                    "openai/gpt-4o",
+                    input={
+                        "top_p": 1,
+                        "prompt": prompt,
+                        "image_input": [],
+                        "temperature": 1,
+                        "system_prompt": "You are an expert college admissions counselor and data analyst. Provide detailed, objective analysis based on the data provided.",
+                        "presence_penalty": 0,
+                        "frequency_penalty": 0,
+                        "max_completion_tokens": 4096
+                    },
+                ):
+                    chunk = str(event)
+                    report_text += chunk
+                    yield f"data: {json.dumps({'type': 'ai_chunk', 'data': chunk})}\n\n"
+                
+                # Send completion signal
+                yield f"data: {json.dumps({'type': 'complete', 'data': report_text})}\n\n"
+            
+            return StreamingResponse(generate(), media_type='text/plain', headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Content-Type': 'text/event-stream',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            })
+        else:
+            # Non-streaming response (original behavior)
+            report_text = ""
+            for event in replicate.stream(
+                "openai/gpt-4o",
+                input={
+                    "top_p": 1,
+                    "prompt": prompt,
+                    "image_input": [],
+                    "temperature": 1,
+                    "system_prompt": "You are an expert college admissions counselor and data analyst. Provide detailed, objective analysis based on the data provided.",
+                    "presence_penalty": 0,
+                    "frequency_penalty": 0,
+                    "max_completion_tokens": 4096
+                },
+            ):
+                print(str(event))
+                report_text += str(event)
+
+            return {
+                'schools_data': schools_data,
+                'ai_report': report_text
+            }
+
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f'API request failed: {str(e)}')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'An error occurred: {str(e)}')
