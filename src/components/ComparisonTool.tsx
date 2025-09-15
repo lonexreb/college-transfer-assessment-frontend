@@ -16,6 +16,64 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 
+// New component for displaying search sources and links
+const SearchSourcesDisplay = ({ schoolsData }: { schoolsData: SchoolData[] }) => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Searched Sources & Links</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          URLs searched by AI to gather transfer information for each school
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {schoolsData.map((school, index) => {
+            if (!school.search_sources || school.search_sources.length === 0) return null;
+
+            return (
+              <div key={index} className="border-l-4 border-primary/20 pl-4">
+                <h3 className="font-semibold text-lg mb-2">{school.name}</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {school.search_sources.length} sources searched for transfer information
+                </p>
+
+                <div className="grid gap-2">
+                  {school.search_sources.map((source, sourceIndex) => (
+                    <div key={sourceIndex} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                      <a
+                        href={source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline truncate flex-1"
+                        title={source}
+                      >
+                        {source}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+
+                {school.search_transfer_data?.targeted_data && (
+                  <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <h4 className="font-medium text-sm text-green-800 dark:text-green-200 mb-1">
+                      Transfer Information Found:
+                    </h4>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      {school.search_transfer_data.targeted_data}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 interface SchoolData {
   name: string;
   city: string;
@@ -320,7 +378,7 @@ const ComparisonTool = () => {
   const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
 
   const handleSchoolChange = (index: number, institution: Institution | null) => {
-    setSelectedSchools(prev => 
+    setSelectedSchools(prev =>
       prev.map((school, i) => i === index ? institution : school)
     );
   };
@@ -563,8 +621,8 @@ const ComparisonTool = () => {
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => navigate('/')}
               className="text-muted-foreground hover:text-foreground"
@@ -885,7 +943,7 @@ const ComparisonTool = () => {
                           strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
                           em: ({children}) => <em className="italic text-foreground">{children}</em>,
                           blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 italic mb-3 text-muted-foreground">{children}</blockquote>,
-                          code: ({inline, children}) => inline ? 
+                          code: ({inline, children}) => inline ?
                             <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">{children}</code> :
                             <code className="block bg-muted p-3 rounded text-sm font-mono overflow-x-auto mb-3">{children}</code>
                         }}
