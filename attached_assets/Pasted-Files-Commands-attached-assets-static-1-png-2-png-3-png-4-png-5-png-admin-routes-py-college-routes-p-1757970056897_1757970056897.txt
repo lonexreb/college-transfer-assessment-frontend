@@ -1,0 +1,1060 @@
+Files
+Commands
+attached_assets
+static
+1.png
+2.png
+3.png
+4.png
+5.png
+admin_routes.py
+college_routes.py
+concussion_routes.py
+firebase.json
+init_admins.py
+main.py
+output_08c15a02-dda1-4440-8b71-d412a1fae300.pptx
+presentation_routes.py
+presentationPrompt.txt
+serviceAccountKey.json
+TFA.pptx
+tfadatabase.csv
+Packager files
+package-lock.json
+package.json
+poetry.lock
+pyproject.toml
+
+from fastapi import APIRouter, HTTPException, Depends, Header, Form
+from typing import Optional
+from pydantic import BaseModel
+import firebase_admin
+from firebase_admin import credentials, auth, firestore
+import os
+
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized successfully")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+        print("Using mock authentication for development")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+# Pydantic models for JSON requests
+class AdminRequest(BaseModel):
+    email: str
+
+# Hardcoded admin emails (always have access)
+HARDCODED_ADMINS = ["nealconwayp@gmail.com"]
+
+# Firebase Firestore functions for admin management
+async def get_admin_emails():
+    """Get all admin emails from Firestore plus hardcoded admins"""
+    try:
+        admins_ref = db.collection('admins')
+        docs = admins_ref.stream()
+        firestore_admins = [doc.id for doc in docs]
+        # Combine Firestore admins with hardcoded admins
+        all_admins = list(set(firestore_admins + HARDCODED_ADMINS))
+        return all_admins
+    except Exception as e:
+        print(f"Error getting admins from Firestore: {e}")
+        # Fallback to hardcoded admins if Firestore fails
+        return HARDCODED_ADMINS
+
+async def add_admin_to_firestore(email: str, added_by: str):
+    """Add admin email to Firestore"""
+    try:
+        admin_data = {
+            "email": email,
+            "addedAt": firestore.SERVER_TIMESTAMP,
+            "addedBy": added_by
+        }
+        db.collection('admins').document(email).set(admin_data)
+        return True
+    except Exception as e:
+        print(f"Error adding admin to Firestore: {e}")
+Unified
+Split
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
+import json
+import replicate
+
+router = APIRouter(prefix="/api/concussion", tags=["concussion"])
+
+class ConcussionRequest(BaseModel):
+    symptoms_description: str
+    patient_age: Optional[int] = None
+    injury_context: Optional[str] = None
+
+class ConcussionResponse(BaseModel):
+    assessment: str  # "concussion", "flare_up", "not_concussion"
+    confidence_level: str  # "high", "medium", "low"
+    severity: Optional[str] = None  # "mild", "moderate", "severe"
+    recommended_actions: list[str]
+    warning_signs: list[str]
+    explanation: str
+
+def analyze_concussion_symptoms(symptoms_text: str, age: Optional[int] = None, context: Optional[str] = None) -> str:
+    """Use AI to analyze symptoms and determine concussion status"""
+    
+    age_context = f"Patient age: {age} years old. " if age else ""
+    injury_context = f"Injury context: {context}. " if context else ""
+    
+    prompt = f"""You are a medical AI assistant specializing in concussion assessment. Analyze the following symptoms and provide a structured assessment.
+
+{age_context}{injury_context}
+
+Symptoms reported: {symptoms_text}
+
+Based on these symptoms, determine:
+1. Assessment category: "concussion", "flare_up" (recurring symptoms from previous concussion), or "not_concussion"
+2. Confidence level: "high", "medium", or "low"
+3. Severity if concussion: "mild", "moderate", or "severe"
+4. Recommended immediate actions
+5. Warning signs to watch for
+6. Brief explanation of reasoning
+
+Consider these key concussion indicators:
+- Headache, dizziness, nausea/vomiting
+- Confusion, memory problems, difficulty concentrating
+- Balance problems, coordination issues
+- Sensitivity to light/noise
+- Sleep disturbances, fatigue
+- Mood changes, irritability
+- Blurred vision, seeing stars
+
+Return your response as a JSON object with this exact structure:
+{
+    "assessment": "concussion|flare_up|not_concussion",
+    "confidence_level": "high|medium|low",
+    "severity": "mild|moderate|severe|null",
+    "recommended_actions": ["action1", "action2", "action3"],
+    "warning_signs": ["warning1", "warning2", "warning3"],
+    "explanation": "detailed explanation of assessment reasoning"
+}
+current match. """Test Firecrawl API connectivity""" on line 136.
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import json
+import requests
+import replicate
+from firecrawl import FirecrawlApp, JsonConfig
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for college routes")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+router = APIRouter(prefix="/api", tags=["college"])
+
+COLLEGECARD_API_KEY = "wERrN1T3KXGwxd9PLxQsipqSvb9mYUcgMUaA3wp0"
+FIRECRAWL_API_KEY = "fc-7578a68f054f419dbc1eee9ea570fe39"
+
+# Pydantic models
+class SearchRequest(BaseModel):
+    query: str
+
+class CompareRequest(BaseModel):
+    schools: List[str]
+    weights: Optional[Dict[str, int]] = None
+
+class School(BaseModel):
+    name: str
+    city: str
+    state: str
+    website: str
+    ownership: str
+    size: Optional[int]
+
+class SearchResponse(BaseModel):
+    schools: List[School]
+
+class TransferDataSchema(BaseModel):
+    has_transfer_page: bool
+    transfer_navigation_ease: int  # 1-5 rating
+    has_credit_evaluation_tool: bool
+    has_articulation_agreements: bool
+    transfer_specific_financial_aid: bool
+    has_transfer_counselor_contact: bool
+    transfer_testimonials_present: bool
+    application_process_clarity: int  # 1-5 rating
+
+def get_ownership_type(ownership_code):
+    ownership_types = {
+        1: 'Public',
+        2: 'Private nonprofit',
+        3: 'Private for-profit'
+    }
+    return ownership_types.get(ownership_code, 'Unknown')
+
+def search_college_transfer_info(college_name):
+    try:
+        print(f"Initializing Firecrawl for {college_name}")
+        app_firecrawl = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
+
+        # Search for transfer-specific information about the college
+        search_query = f"{college_name} transfer students credit evaluation articulation agreements financial aid"
+        print(f"Search query: {search_query}")
+
+        # Search the internet for transfer information
+        print("Making Firecrawl search API call...")
+        print(f"API Key being used: {FIRECRAWL_API_KEY[:10]}...")  # Only show first 10 chars for security
+Unified
+Split
+There are no changes to show.
+Production
+Status
+Neal published 16 minutes ago
+Visibility
+Public
+Domain
+https://degree-works-backend-HydraBeans.replit.app
+Type
+Autoscale(4 vCPU / 8 GiB RAM / 3 Max)
+See all usage
+97bfb2d9
+NC
+HydraBeans
+Neal published 31 minutes ago
+3078204b
+NC
+HydraBeans
+Neal published about 1 hour ago
+917f8bcb
+NC
+HydraBeans
+Neal published about 1 hour ago
+56348ce8
+NC
+HydraBeans
+Neal published 7 days ago
+ae7ab479
+NC
+HydraBeans
+Neal published 12 days ago
+6551c2d4
+NC
+HydraBeans
+Neal published 12 days ago
+7c78520d
+NC
+HydraBeans
+Neal published 12 days ago
+72340b4a
+NC
+HydraBeans
+Neal published 12 days ago
+17930a32
+NC
+HydraBeans
+Neal published 13 days ago
+7c5bf168
+NC
+HydraBeans
+Neal published 13 days ago
+e0c404d7
+NC
+HydraBeans
+Neal published 13 days ago
+2c6347b1
+NC
+HydraBeans
+Neal published 13 days ago
+f1be67f9
+NC
+HydraBeans
+Neal published 13 days ago
+e475ee0d
+NC
+HydraBeans
+Neal published 13 days ago
+9c8054b0
+NC
+HydraBeans
+Neal published 13 days ago
+793e5e3b
+NC
+HydraBeans
+Neal published 13 days ago
+401d53ba
+NC
+HydraBeans
+Neal published 13 days ago
+7f8781a6
+NC
+HydraBeans
+Neal published 13 days ago
+2580921b
+NC
+HydraBeans
+Neal published 13 days ago
+ab12b228
+NC
+HydraBeans
+Neal published 13 days ago
+8b989ccd
+NC
+HydraBeans
+Neal published 13 days ago
+6b2dcf6c
+NC
+HydraBeans
+Neal published 13 days ago
+da7967c6
+NC
+HydraBeans
+Neal published 14 days ago
+18m • 18 minutes ago
+Commit
+There are no changes to commit.
+REPLICATE_API_TOKEN
+••••••••
+SESSION_SECRET
+••••••••
+Access secret
+import os
+my_secret = os.environ['REPLICATE_API_TOKEN']
+/
+Total 9
+Name	Added	Size
+presentations
+	-	-	
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import Response, StreamingResponse
+import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
+import uuid
+import json
+import asyncio
+import time
+import os
+import pandas as pd
+from pptx import Presentation, parts
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+import replicate
+from replit.object_storage import Client
+from pptx.dml.color import RGBColor
+
+# Initialize Firebase if not already done
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate("serviceAccountKey.json")
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized for presentations")
+    except Exception as e:
+        print(f"Warning: Firebase Admin not initialized - {e}")
+
+# Initialize Firestore client
+db = firestore.client()
+
+# Initialize Object Storage client
+storage_client = Client()
+
+router = APIRouter(prefix="/api/v1/ppt", tags=["presentation"])
+
+def load_tfa_database():
+    """Load and process the TFA database"""
+    try:
+        df = pd.read_csv('tfadatabase.csv')
+        # Clean up the data
+        df = df.dropna(subset=['School'])
+        df['Avg TFA Level'] = pd.to_numeric(df['Avg TFA Level'], errors='coerce')
+        df['Assigned TFA Level'] = pd.to_numeric(df['Assigned TFA Level'], errors='coerce')
+        return df
+    except Exception as e:
+        print(f"Error loading TFA database: {e}")
+        return None
+
+def calculate_comparative_scores(university_name, overall_score):
+    """Calculate comparison scores based on TFA database"""
+    df = load_tfa_database()
+    if df is None:
+        return 3, 3  # Default scores if database unavailable
+
+    # Calculate average scores from database
+    avg_overall = df['Assigned TFA Level'].mean()
+
+    # Compare this university to database average
+    comparison_score = min(5, max(1, int(overall_score / avg_overall * 3)))
+
+    # Find similar institutions (same type/size if possible)
+    competitors_avg = avg_overall  # Simplified - could be more sophisticated
+    competitors_score = min(5, max(1, int(overall_score / competitors_avg * 3)))
+
+    return comparison_score, competitors_score
+
+def GenerateReportJSON(research):
+    # Set up Replicate API token    
+    prompt = f"Research: {research}\n\n Response Guidelines: "
+    result = ""
+
+    with open('presentationPrompt.txt', 'r') as file:
+        prompt += file.read()
+
+    for event in replicate.stream(
+Unified
+Split
+⦚ 63 unchanged lines ⦚
+    }
+    return ownership_types.get(ownership_code, 'Unknown')
+
+def crawl_college_website(college_name, website_url):
+    if not website_url or website_url == '#':
+        return None
+    
+    try:
+        app_firecrawl = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
+        
+        # Scrape with no timeout restrictions
+        scrape_result = app_firecrawl.scrape_url(
+            website_url,
+            formats=['markdown'],
+            only_main_content=True
+        )
+        
+        # Extract the markdown content for analysis
+        if scrape_result and 'data' in scrape_result:
+            markdown_content = scrape_result['data'].get('markdown', '')
+            
+            # Look for transfer-related keywords in content
+            transfer_keywords = ['transfer', 'credit', 'articulation', 'equivalency', 'admissions']
+            transfer_content = ""
+            
+            if markdown_content:
+                lines = markdown_content.split('\n')
+                for line in lines:
+                    if any(keyword.lower() in line.lower() for keyword in transfer_keywords):
+                        transfer_content += line + "\n"
+                
+                return {
+                    'website_content': transfer_content[:3000] if transfer_content else markdown_content[:2000],
+⦚ 63 unchanged lines ⦚
+    }
+    return ownership_types.get(ownership_code, 'Unknown')
+
+def search_college_transfer_info(college_name):
+    try:
+        app_firecrawl = FirecrawlApp(api_key=FIRECRAWL_API_KEY)
+        
+        # Search for transfer-specific information about the college
+        search_query = f"{college_name} transfer students credit evaluation articulation agreements financial aid"
+        
+        # Search the internet for transfer information
+        search_result = app_firecrawl.search(
+            query=search_query,
+            limit=5,
+            scrape_options={
+                "formats": ["markdown"],
+                "only_main_content": True
+            }
+        )
+        
+        if search_result and 'data' in search_result:
+            transfer_content = ""
+            sources = []
+            
+            for result in search_result['data']:
+                if 'markdown' in result and result['markdown']:
+                    # Extract transfer-relevant content
+                    markdown = result['markdown']
+                    transfer_keywords = ['transfer', 'credit', 'articulation', 'equivalency', 'admissions', 'financial aid']
+                    
+                    lines = markdown.split('\n')
+                    relevant_lines = []
+                    for line in lines:
+                        if any(keyword.lower() in line.lower() for keyword in transfer_keywords):
+Unified
+Split
+⦚ 83 unchanged lines ⦚
+        if search_result and 'data' in search_result:
+            transfer_content = ""
+            sources = []
+            
+            for result in search_result['data']:
+                if 'markdown' in result and result['markdown']:
+                    # Extract transfer-relevant content
+                    markdown = result['markdown']
+⦚ 6 unchanged lines ⦚
+                            relevant_lines.append(line.strip())
+                    
+                    if relevant_lines:
+                        transfer_content += f"\n\nFrom {result.get('url', 'Unknown source')}:\n"
+                        transfer_content += "\n".join(relevant_lines[:10])  # Limit to 10 most relevant lines per source
+⦚ 83 unchanged lines ⦚
+        if search_result and 'data' in search_result:
+            transfer_content = ""
+            sources = []
+            all_sources = []  # Track all searched URLs
+            
+            for result in search_result['data']:
+                url = result.get('url', 'Unknown source')
+                all_sources.append(url)  # Add all URLs to sources list
+                
+                if 'markdown' in result and result['markdown']:
+                    # Extract transfer-relevant content
+                    markdown = result['markdown']
+⦚ 6 unchanged lines ⦚
+                            relevant_lines.append(line.strip())
+                    
+                    if relevant_lines:
+                        transfer_content += f"\n\nFrom {url}:\n"
+                        transfer_content += "\n".join(relevant_lines[:10])  # Limit to 10 most relevant lines per source
+                        sources.append(url)
+            
+            return {
+                'search_content': transfer_content[:4000] if transfer_content else f"Limited transfer information found for {college_name}",
+                'sources': all_sources,  # Return all searched URLs
+                'relevant_sources': sources,  # URLs with relevant content
+                'targeted_data': f"Searched internet for {college_name} transfer information - found {len(sources)} relevant sources with transfer-specific content out of {len(all_sources)} total sources searched."
+Unified
+Split
+
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink, Globe, CheckCircle } from "lucide-react";
+
+interface SearchTransferData {
+  search_content: string;
+  sources: string[];
+  relevant_sources: string[];
+  targeted_data: string;
+}
+
+interface SchoolData {
+  name: string;
+  search_transfer_data?: SearchTransferData;
+  search_sources?: string[];
+}
+
+interface SearchSourcesDisplayProps {
+  schoolsData: SchoolData[];
+}
+
+const SearchSourcesDisplay: React.FC<SearchSourcesDisplayProps> = ({ schoolsData }) => {
+  const getDomainFromUrl = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {schoolsData.map((school, schoolIndex) => {
+        const searchData = school.search_transfer_data;
+        const allSources = searchData?.sources || school.search_sources || [];
+        const relevantSources = searchData?.relevant_sources || [];
+
+        if (allSources.length === 0) {
+          return null;
+        }
+
+        return (
+          <Card key={schoolIndex}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                Transfer Information Sources for {school.name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {searchData?.targeted_data || `Found ${allSources.length} sources with transfer information`}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Search Summary */}
+                {searchData?.search_content && (
+Unified
+Split
+⦚ 14 unchanged lines ⦚
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface SchoolData {
+  name: string;
+⦚ 820 unchanged lines ⦚
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* AI Analysis Report */}
+                <Card>
+⦚ 150 unchanged lines ⦚
+⦚ 14 unchanged lines ⦚
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import SearchSourcesDisplay from "./SearchSourcesDisplay";
+
+interface SchoolData {
+  name: string;
+⦚ 820 unchanged lines ⦚
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Search Sources Display */}
+                <SearchSourcesDisplay schoolsData={comparisonResult.schools_data} />
+
+                {/* AI Analysis Report */}
+                <Card>
+⦚ 150 unchanged lines ⦚
+Unified
+Split
+
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink, Globe, CheckCircle } from "lucide-react";
+
+interface SearchTransferData {
+  search_content: string;
+  sources: string[];
+  relevant_sources: string[];
+  targeted_data: string;
+}
+
+interface SchoolData {
+  name: string;
+  search_transfer_data?: SearchTransferData;
+  search_sources?: string[];
+}
+
+interface SearchSourcesDisplayProps {
+  schoolsData: SchoolData[];
+}
+
+const SearchSourcesDisplay: React.FC<SearchSourcesDisplayProps> = ({ schoolsData }) => {
+  const getDomainFromUrl = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {schoolsData.map((school, schoolIndex) => {
+        const searchData = school.search_transfer_data;
+        const allSources = searchData?.sources || school.search_sources || [];
+        const relevantSources = searchData?.relevant_sources || [];
+
+        if (allSources.length === 0) {
+          return null;
+        }
+
+        return (
+          <Card key={schoolIndex}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                Transfer Information Sources for {school.name}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {searchData?.targeted_data || `Found ${allSources.length} sources with transfer information`}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Search Summary */}
+                {searchData?.search_content && (
+Chats
+Archived
+College transfer information crawling
+1 hour ago
+Here
+7 days ago
+Concussion screener endpoint AI
+7 days ago
+
+lets have it so that instead of scraping the url it crawls the internet for college transfer information for that certain college
+NC
+HydraBeans
+Assistant48 minutes ago
+
+I'll update the college routes to use Firecrawl's search API instead of scraping individual URLs. This will search the internet for transfer information about each college rather than just scraping their main website.
+college_routes.py
+
+Now instead of just scraping each college's main website, the system will search the entire internet for transfer-related information about each college. This should provide much more comprehensive and relevant data about transfer policies, credit evaluation tools, articulation agreements, and financial aid specific to transfer students.
+
+The search will look for terms like "transfer students", "credit evaluation", "articulation agreements", and "financial aid" combined with the college name, giving you a broader view of the college's transfer friendliness from multiple sources across the web.
+Checkpoint made
+Replace website scraping with internet search for transfer info
+1 hour ago
+•
+
+as part of the request could you add the links to the sites that you searched
+NC
+HydraBeans
+Assistant37 minutes ago
+
+I'll modify the college routes to include the search sources/links in the response so you can see which websites were searched for transfer information.
+college_routes.py
+
+The changes will now include:
+
+    All searched URLs in the search_sources field for each school
+    Relevant sources (URLs with transfer-specific content) in the relevant_sources field
+    Updated targeted data showing both relevant and total sources searched
+
+This way you'll be able to see exactly which websites were searched for transfer information for each college, and which ones contained relevant transfer-related content.
+Checkpoint made
+Add search sources/links to API response
+55 minutes ago
+•
+
+does it send it back in the post request?
+NC
+HydraBeans
+Assistant35 minutes ago
+
+Looking at your college routes code, yes, the search sources are sent back in the POST request response.
+
+In the /compare and /compare-stream endpoints, the search sources are included in multiple ways:
+
+    In the school data: Each school object includes a search_sources field containing all the URLs that were searched:
+
+'search_sources': search_data.get('sources', []) if search_data else []
+
+    In the search transfer data: The search_transfer_data object for each school contains:
+        sources: All searched URLs
+        relevant_sources: URLs that contained transfer-specific content
+        search_content: The actual transfer information found
+        targeted_data: Summary of the search results
+
+    For streaming responses: The search sources are sent in the initial schools_data payload before the AI report starts streaming.
+
+    For non-streaming responses: The search sources are included in the returned schools_data object.
+
+So when you make a POST request to /api/compare or /api/compare-stream, you'll receive the search sources as part of the response data, allowing you to see exactly which websites were crawled for transfer information for each college.
+
+does the app specifically search for transfer data or does it just go to the main page then start searching
+NC
+HydraBeans
+Assistant31 minutes ago
+
+Looking at your
+
+code, the app specifically searches for transfer data rather than just going to the main page.
+
+Here's how the transfer-specific search works in the search_college_transfer_info function:
+
+    Targeted Search Query: It creates a specific search query focused on transfer information:
+
+search_query = f"{college_name} transfer students credit evaluation articulation agreements financial aid"
+
+Internet-wide Search: It uses Firecrawl's search API to search the entire internet (not just the college's main website):
+
+search_result = app_firecrawl.search(
+    query=search_query,
+    limit=5,
+    scrape_options={
+        "formats": ["markdown"],
+        "only_main_content": True
+    }
+)
+
+Transfer-focused Content Filtering: It then filters the results to only include transfer-relevant content by looking for specific keywords:
+
+transfer_keywords = ['transfer', 'credit', 'articulation', 'equivalency', 'admissions', 'financial aid']
+
+    for line in lines:
+        if any(keyword.lower() in line.lower() for keyword in transfer_keywords):
+            relevant_lines.append(line.strip())
+
+So the app doesn't just scrape the college's main website - it performs a targeted internet search specifically for transfer-related information about each college, then filters and extracts only the most relevant transfer-specific content from multiple sources across the web.
+
+The search sources (URLs of all websites searched) are included in the response so you can see exactly which sites were crawled for transfer information.
+
+show me the new endpoint with the scraped data so i can add it to frontend
+NC
+HydraBeans
+Assistant30 minutes ago
+
+Looking at your
+
+, the endpoints that return the scraped transfer data are:
+/api/compare (Non-streaming)
+
+POST request with body:
+
+{
+  "schools": ["School Name 1", "School Name 2"],
+  "weights": {
+    "transfer_navigation": 25,
+    "landing_pages": 20,
+    "evaluation_tools": 15,
+    "articulation_agreements": 15,
+    "support_resources": 15,
+    "application_process": 10
+  }
+}
+
+Response:
+
+{
+  "schools_data": [
+    {
+      "name": "School Name",
+      "city": "City",
+      "state": "State", 
+      "website": "https://...",
+      "ownership": "Public/Private",
+      "student_size": 25000,
+      "admission_rate": 0.65,
+      "in_state_tuition": 12000,
+      "out_of_state_tuition": 28000,
+      "median_earnings_10yr": 45000,
+      "search_transfer_data": {
+        "search_content": "Transfer information found...",
+        "sources": ["https://...", "https://..."],
+        "relevant_sources": ["https://..."],
+        "targeted_data": "Search summary..."
+      },
+      "search_sources": ["https://...", "https://..."]
+    }
+  ],
+  "ai_report": "Full AI analysis report..."
+}
+
+/api/compare-stream (Server-Sent Events)
+
+Same POST request format, but returns streaming data:
+
+    First event contains schools_data with all the scraped information
+    Subsequent events contain AI report chunks
+    Final event signals completion
+
+The scraped data includes:
+
+    search_sources: All URLs that were searched for transfer information
+    search_transfer_data.sources: All searched URLs (same as search_sources)
+    search_transfer_data.relevant_sources: URLs that contained transfer-specific content
+    search_transfer_data.search_content: The actual transfer information extracted
+    search_transfer_data.targeted_data: Summary of the search results
+
+For your frontend, you can use either endpoint depending on whether you want real-time streaming or a single response with all data.
+
+what kind of code should I put in my react so that it will be able to show the searched pages
+NC
+HydraBeans
+Assistant29 minutes ago
+
+Looking at your
+
+, I can see that the search sources (URLs of scraped websites) are already included in the API response. Here's the React code you'll need to display the searched pages:
+SearchSourcesDisplay.tsx
+Reverted
+Create component to display searched pages
+
+Now you need to import and use this component in your comparison tool. Here's how to add it to your existing React component:
+attached_assets/Pasted-import-useState-useEffect-from-react-import-Button-from-components-ui-button-import-1755654313419_1755654313420.txt
+Reverted
+Add SearchSourcesDisplay component, Add search sources display after school data table
+
+This will add a new section that displays:
+
+    All searched websites for each school with their URLs
+    Which sources contained relevant transfer information (highlighted in green)
+    A summary of the transfer content found
+    Statistics showing search effectiveness
+    Direct links to visit each source website
+    Domain names for easier identification
+
+The component automatically handles the data structure from your API response, showing both search_sources and the more detailed search_transfer_data information.
+Checkpoint madeReverted
+Add SearchSourcesDisplay component to show scraped sources
+46 minutes ago
+•
+
+these searches aren't showing up in my firecrawl activity logs
+NC
+HydraBeans
+Assistant15 minutes ago
+
+Looking at your code in
+
+, I can see the issue. The Firecrawl searches are happening, but they might not be showing up in your activity logs because of how the API calls are structured or potential API key issues.
+
+Let me help you debug this by adding some logging and error handling to see what's happening with the Firecrawl API calls:
+college_routes.py
+
+Also, let's verify your Firecrawl API key is working by adding a simple test endpoint:
+
+Now you can:
+
+    Test your API key: Visit /api/test-firecrawl to see if your Firecrawl API key is working
+    Check the logs: When you run a comparison, look at the console output for detailed Firecrawl logging
+    Monitor activity: The searches should now appear in your Firecrawl dashboard if the API key is valid
+
+The most common reasons searches don't show up in Firecrawl activity logs are:
+
+    Invalid or expired API key
+    API rate limits being hit
+    Network connectivity issues
+    Firecrawl service being down
+
+Run the test endpoint first to verify your setup, then check the detailed logs when running comparisons.
+Checkpoint made
+Add Firecrawl debugging and test endpoint
+33 minutes ago
+•
+
+the test is working but compare-stream isn't calling search
+NC
+HydraBeans
+Assistant6 minutes ago
+
+Looking at your
+
+, I can see the issue. The search_college_transfer_info function is being called within the compare endpoints, but there might be an issue with how the Firecrawl search is being executed or logged.
+
+Let me add more detailed logging to help debug why the searches aren't showing up in your Firecrawl activity logs:
+college_routes.py
+Add more detailed logging and error handling to debug Firecrawl search issues, Add more detailed Firecrawl API logging
+
+Now test the compare-stream endpoint again and check your console output. The logs will tell us:
+
+    If the search function is being called at all
+    What the API response looks like
+    If there are any API errors
+    Whether the API key is being used correctly
+
+After you run a comparison, you should see detailed logs in your console showing exactly what's happening with each Firecrawl search call. This will help us identify if:
+
+    The searches are being made but not showing in your dashboard
+    There's an API key issue
+    The searches are failing silently
+    The API calls aren't being made at all
+
+/api-compare-stream not searching
+NC
+HydraBeans
+Assistant4 minutes ago
+
+Looking at the console output, I can see the issue with your /api/compare-stream endpoint. The Firecrawl search is failing with this error:
+
+AttributeError: 'dict' object has no attribute 'dict'
+
+The problem is in the search_college_transfer_info function. You're passing scrape_options as a dictionary, but the Firecrawl library expects a specific object type. Let me fix this:
+college_routes.py
+
+The issue was that you were passing scrape_options as a dictionary, but the Firecrawl library was trying to call .dict() method on it, expecting it to be a Pydantic model object. By removing the scrape_options parameter, the search should work with default settings.
+
+Now test your /api/compare-stream endpoint again. The Firecrawl searches should start appearing in your activity logs, and you should see the detailed logging output showing:
+
+    The search being initiated for each school
+    The API call being made successfully
+    Search results being processed
+    Sources being collected and returned
+
+The search functionality should now work properly for both the streaming and non-streaming endpoints.
+Checkpoint made
+Fix Firecrawl API call to resolve search issues
+22 minutes ago
+•
+
+it only searched for one school not all of the schools in the list in compare-stream
+NC
+HydraBeans
+Assistant18 minutes ago
+
+Looking at your console output, I can see the issue. The /api/compare-stream endpoint is only processing one school ("Mit") instead of all schools in the list. The problem is in the _compare_schools_helper function - it's not properly iterating through all the schools when doing the Firecrawl searches.
+
+I can see from the logs that it processed "Berkely" but found no API data (API Data for Berkely: []), and then processed "Mit" with the Firecrawl search. The issue is that when a school isn't found in the College Scorecard API, it's not being added to schools_data, so the Firecrawl search never happens for those schools.
+
+Let me fix this by ensuring all schools get processed and searched, even if the College Scorecard API doesn't find exact matches:
+college_routes.py
+
+Now the /api/compare-stream endpoint will:
+
+    Process every school in the request, regardless of whether the College Scorecard API finds it
+    Always perform Firecrawl searches for each school to get transfer information
+    Use fallback data when College Scorecard doesn't have information about a school
+    Include all schools in the final response and AI analysis
+
+This ensures that even if you search for "Berkeley" and the College Scorecard API doesn't find an exact match, it will still:
+
+    Perform the Firecrawl search for Berkeley transfer information
+    Include Berkeley in the comparison with whatever data is available
+    Show up in your Firecrawl activity logs
+
+Try the compare-stream endpoint again and you should see Firecrawl searches being performed for all schools in your list!
+Checkpoint made
+Fix compare-stream to search all schools
+18 minutes ago
+•
+
+i want to send the links to my frontend that you searched
+NC
+HydraBeans
+Assistantjust now
+
+Looking at your code, I can see that the search sources are already being sent to your frontend! In the /api/compare-stream endpoint, the searched links are included in the response data.
+
+Here's what's already happening:
+
+    The links are collected: Each school's data includes search_sources which contains all the URLs that were searched by Firecrawl.
+
+    The links are sent to frontend: In the streaming response, the first data sent includes all the school data with sources:
+
+# First send the school data (includes search sources)
+yield f"data: {json.dumps({'type': 'schools_data', 'data': schools_data})}\n\n"
+
+Each school in schools_data has this structure:
+
+school_data = {
+    'name': school_name,
+    'city': 'N/A',
+    'state': 'N/A', 
+    'website': '#',
+    'ownership': 'Unknown',
+    'student_size': None,
+    'admission_rate': None,
+    'in_state_tuition': None,
+    'out_of_state_tuition': None,
+    'median_earnings_10yr': None,
+    'search_transfer_data': search_data,
+    'search_sources': search_data.get('sources', []) if search_data else []  # <-- The links are here!
+}
+
+From your console output, I can see the Firecrawl searches are working and finding links like:
+
+    https://berkeleycollege.edu/admissions/transfer-students/index.html
+    https://ceu.berkeley.edu/transfer-credit/course-evaluation/
+    https://registrar.mit.edu/registration-academics/transfer-credit
+    etc.
+
+In your frontend React code, you should be able to access these links from the schools_data that gets sent first in the stream. Each school object will have a search_sources array containing all the URLs that were searched.
+
+The links are already being sent - you just need to display them in your frontend UI by accessing the search_sources property from each school in the response data.
